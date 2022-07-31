@@ -23,14 +23,15 @@ from transformers import (
     default_data_collator,
     set_seed,
 )
-# from transformers.integrations import MLflowCallback
+from transformers.integrations import MLflowCallback
 
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
+from transformers.trainer_utils import get_last_checkpoint
 
 from utils import get_config,DataTrainingArguments,ModelArguments
-from utils.callbacks import MLflowCallback
+from utils.callbacks import CustomMLflowCallback
 
 parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
 model_args, data_args, training_args = parser.parse_json_file("config.json")
@@ -57,14 +58,23 @@ set_seed(training_args.seed)
 
 padding = "max_length"
 
-raw_datasets = load_dataset(
+train= load_dataset(
     data_args.dataset_name,
     data_args.dataset_config_name,
     cache_dir=model_args.cache_dir,
     use_auth_token=True if model_args.use_auth_token else None,
+    split = 'train'
 )
 
-label_list = raw_datasets["train"].unique("label")
+test = load_dataset(
+    data_args.dataset_name,
+    data_args.dataset_config_name,
+    cache_dir=model_args.cache_dir,
+    use_auth_token=True if model_args.use_auth_token else None,
+    split = 'test'
+)
+
+label_list = train.unique("label")
 label_list.sort()  # Let's sort it for determinism
 num_labels = len(label_list)
 
@@ -95,7 +105,7 @@ model = AutoModelForSequenceClassification.from_pretrained(
     ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
 )
 
-non_label_column_names = [name for name in raw_datasets["train"].column_names if name != "label"]
+non_label_column_names = [name for name in train.column_names if name != "label"]
 sentence1_key, sentence2_key = non_label_column_names[0], None
 label_to_id = {v: i for i, v in enumerate(label_list)}
 
@@ -116,28 +126,63 @@ max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 def preprocess_function(examples):
     # Tokenize the texts
     args = (
-        (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
+        examples[sentence1_key] if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
     )
+    print("exmples :",len(examples))
+
     result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
 
     # Map labels to IDs (not necessary for GLUE tasks)
     if label_to_id is not None and "label" in examples:
         result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+    print("result :",len(result))
     return result
 
 
-with training_args.main_process_first(desc="dataset map pre-processing"):
-    raw_datasets = raw_datasets.map(
-        preprocess_function,
-        batched=True,
-        load_from_cache_file=not data_args.overwrite_cache,
-        desc="Running tokenizer on dataset",
-    )
+def tokenize(batch):
+    """
+    Tokenizer for non-streaming read. Additional features are available when using
+    the map function of a dataset.Dataset instead of a dataset.IterableDataset, 
+    therefore different tokenizer functions are used for each case.
+    """
+    return tokenizer(batch['text'], 
+                     padding='max_length', 
+                     truncation=True)
+  
+  # See the docs for mapping a function to a DatasetDict at
+  # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.DatasetDict.map
+train_set = datasets.Dataset.from_dict(tokenize(train))
+train_set = train_set.add_column(name="label", column=train['label'])
+train_set = train_set.add_column(name="text", column=train['text'])
+
+
+test_set = datasets.Dataset.from_dict(tokenize(test))
+test_set = test_set.add_column(name="label", column=test['label'])
+test_set = test_set.add_column(name="text", column=test['text'])
+# test = tokenize(test)
+
+# with training_args.main_process_first(desc="dataset map pre-processing"):
+#     raw_datasets['train'] = train.map(
+#         preprocess_function,
+#         batched=True,
+#         # load_from_cache_file=not data_args.overwrite_cache,
+#         desc="Running tokenizer on dataset",
+#     )
+
+#     raw_datasets['test'] = test.map(
+#         preprocess_function,
+#         batched=True,
+#         # load_from_cache_file=not data_args.overwrite_cache,
+#         desc="Running tokenizer on dataset",
+    # )
+
+
+
+
+
 
 if training_args.do_train:
-    if "train" not in raw_datasets:
-        raise ValueError("--do_train requires a train dataset")
-    train_dataset = raw_datasets["train"]
+    train_dataset = train_set
     if data_args.max_train_samples is not None:
         max_train_samples = min(len(train_dataset), data_args.max_train_samples)
         train_dataset = train_dataset.select(range(max_train_samples))
@@ -180,13 +225,12 @@ elif training_args.fp16:
 else:
     data_collator = None
 
-eval_dataset = raw_datasets["validation_matched" if data_args.task_name == "mnli" else "test"]
 # Initialize our Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=train_dataset if training_args.do_train else None,
-    eval_dataset=eval_dataset if training_args.do_eval else None,
+    train_dataset=train_set,
+    eval_dataset=test_set,
     compute_metrics=compute_metrics,
     tokenizer=tokenizer,
     data_collator=data_collator,
@@ -194,12 +238,16 @@ trainer = Trainer(
 
 os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = 'True'
 os.environ["MLFLOW_EXPERIMENT_NAME"] = 'banking_nlp_classifier'
-os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"bert"}'
+os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"albert-base-v2"}'
 os.environ["CREATE_MFLOW_MODEL"] = 'True'
 os.environ["MLFLOW_TRACKING_URI"] = 'sqlite:///mlflow.db'
+os.environ["MLFLOW_NESTED_RUN"] = 'True'
+os.environ["TOKENIZERS_PARALLELISM"] = 'True'
 
-trainer.add_callback(MLflowCallback)
-last_checkpoint = None
+trainer.remove_callback(MLflowCallback)
+trainer.add_callback(CustomMLflowCallback)
+is_regression = False
+last_checkpoint = get_last_checkpoint(training_args.output_dir)
 training_args.max_token_length = 128
     # Training
 if training_args.do_train:
@@ -208,12 +256,14 @@ if training_args.do_train:
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
+    train_result = trainer.train(resume_from_checkpoint=None)
+if training_args.do_eval:
+    trainer.evaluate()
 
 
-# Evaluation
 if training_args.do_eval:
     logger.info("*** Evaluate ***")
+    trainer.evaluate()
 
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     tasks = [data_args.task_name]

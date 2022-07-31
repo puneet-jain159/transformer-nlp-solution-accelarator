@@ -14,9 +14,12 @@
   "max_token_length": 40,
   "per_device_train_batch_size": 128,
   "per_device_eval_batch_size" : 128,
-  "num_train_epochs": 1,
+  "evaluation_strategy" : "epoch",
+  "save_strategy" : "epoch",
+  "load_best_model_at_end" : true,
+  "metric_for_best_model" : "accuracy",
+  "num_train_epochs": 10,
   "save_total_limit": 10,
-  "metric_for_best_model": "f1",
   "seed": 123,
   "output_dir" : "tmp/"
 }
