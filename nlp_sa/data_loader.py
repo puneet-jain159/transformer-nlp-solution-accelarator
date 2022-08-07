@@ -48,10 +48,17 @@ class DataLoader:
 
             if self.conf.data_args.train_table:
                 logger.debug(
-                    f"Loading the data from table: {self.conf.data_args.train_table}")
-                train = spark.read.table(f"{self.conf.data_args.database_name}.{self.conf.data_args.train_table}")
+                    f"Loading the train data from table: {self.conf.data_args.train_table}")
+                train = self.spark.read.table(f"{self.conf.data_args.database_name}.{self.conf.data_args.train_table}")
                 train = train.toPandas()
                 self.train = Dataset.from_pandas(train)
+           
+            if self.conf.data_args.validation_table:
+                logger.debug(
+                    f"Loading the data validation table from: {self.conf.data_args.validation_table}")
+                train = self.spark.read.table(f"{self.conf.data_args.database_name}.{self.conf.data_args.validation_table}")
+                validation = train.toPandas()
+                self.train = Dataset.from_pandas(validation)
 
 
 

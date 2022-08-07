@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 from .custom_func import TransformerModel
 
-from transformers.utils import flatten_dict, is_datasets_available, logging, ENV_VARS_TRUE_VALUES, is_torch_tpu_available
+from transformers.utils import flatten_dict,logging, ENV_VARS_TRUE_VALUES, is_torch_tpu_available
 
 
 logger = logging.get_logger(__name__)

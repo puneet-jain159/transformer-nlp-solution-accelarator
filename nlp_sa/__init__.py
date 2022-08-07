@@ -12,7 +12,7 @@ from transformers import (
 )
 
 from transformers.utils import logging
-from utils import get_config, DataTrainingArguments, ModelArguments
+from .utils import get_config, DataTrainingArguments, ModelArguments
 
 logger = logging.get_logger(__name__)
 

@@ -6,6 +6,8 @@ log_level: debug
 do_train: true
 do_eval: true
 
+dataset_name: banking77
+
 database_name: default
 train_table: banking77_train
 validation_table: banking77_test
