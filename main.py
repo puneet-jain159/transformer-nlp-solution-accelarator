@@ -16,24 +16,22 @@ from transformers import (
     AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
-    HfArgumentParser,
     PretrainedConfig,
     Trainer,
-    TrainingArguments,
     default_data_collator,
     set_seed,
 )
-# from transformers.integrations import MLflowCallback
+from transformers.integrations import MLflowCallback
 
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
+from transformers.trainer_utils import get_last_checkpoint
 
-from utils import get_config,DataTrainingArguments,ModelArguments
-from utils.callbacks import MLflowCallback
 
-parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-model_args, data_args, training_args = parser.parse_json_file("config.json")
+from utils.callbacks import CustomMLflowCallback
+from nlp_sa import ConfLoader
+from nlp_sa.data_loader import DataLoader
 
 logger = logging.getLogger("runner.log")
 
@@ -43,28 +41,19 @@ logging.basicConfig(
     filename= "runner.log",
     filemode='a')
 
-log_level = training_args.get_process_log_level()
+conf = ConfLoader()
+
+log_level = conf.training_args.log_level
 logger.setLevel(log_level)
 
-logger.warning(
-    f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-    + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
-)
-logger.info(f"Training/evaluation parameters {training_args}")
+set_seed(conf.training_args.seed)
+
+padding = "True"
+
+DataSet = DataLoader(conf)
 
 
-set_seed(training_args.seed)
-
-padding = "max_length"
-
-raw_datasets = load_dataset(
-    data_args.dataset_name,
-    data_args.dataset_config_name,
-    cache_dir=model_args.cache_dir,
-    use_auth_token=True if model_args.use_auth_token else None,
-)
-
-label_list = raw_datasets["train"].unique("label")
+label_list = DataSet.raw_datasets["train"].unique("label")
 label_list.sort()  # Let's sort it for determinism
 num_labels = len(label_list)
 
@@ -118,13 +107,19 @@ def preprocess_function(examples):
     args = (
         (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
     )
-    result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
+    result = tokenizer(*args,max_length = max_seq_length,truncation=True)
 
-    # Map labels to IDs (not necessary for GLUE tasks)
-    if label_to_id is not None and "label" in examples:
-        result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+    # # Map labels to IDs (not necessary for GLUE tasks)
+    # if label_to_id is not None and "label" in examples:
+    #     result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
     return result
 
+if data_args.max_seq_length > tokenizer.model_max_length:
+    logger.warning(
+            f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
+            f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
+        )
+max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
 with training_args.main_process_first(desc="dataset map pre-processing"):
     raw_datasets = raw_datasets.map(
@@ -180,27 +175,55 @@ elif training_args.fp16:
 else:
     data_collator = None
 
-eval_dataset = raw_datasets["validation_matched" if data_args.task_name == "mnli" else "test"]
+test = load_dataset(
+    data_args.dataset_name,
+    data_args.dataset_config_name,
+    cache_dir=model_args.cache_dir,
+    use_auth_token=True if model_args.use_auth_token else None,
+    split = 'test'
+)
+
+
+def tokenize(batch):
+    """
+    Tokenizer for non-streaming read. Additional features are available when using
+    the map function of a dataset.Dataset instead of a dataset.IterableDataset, 
+    therefore different tokenizer functions are used for each case.
+    """
+    return tokenizer(*(batch['text'],),
+                    padding =True,
+                    max_length = max_seq_length,
+                    truncation=True)
+
+
+test_set = datasets.Dataset.from_dict(tokenize(test))
+test_set = test_set.add_column(name="label", column=test['label'])
+test_set = test_set.add_column(name="text", column=test['text'])
+
 # Initialize our Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=train_dataset if training_args.do_train else None,
-    eval_dataset=eval_dataset if training_args.do_eval else None,
+    eval_dataset=test_set,
     compute_metrics=compute_metrics,
-    tokenizer=tokenizer,
-    data_collator=data_collator,
+    tokenizer=tokenizer
 )
 
 os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = 'True'
 os.environ["MLFLOW_EXPERIMENT_NAME"] = 'banking_nlp_classifier'
-os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"bert"}'
+os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"albert-base-v2"}'
 os.environ["CREATE_MFLOW_MODEL"] = 'True'
 os.environ["MLFLOW_TRACKING_URI"] = 'sqlite:///mlflow.db'
+os.environ["MLFLOW_NESTED_RUN"] = 'True'
+os.environ["TOKENIZERS_PARALLELISM"] = 'True'
 
-trainer.add_callback(MLflowCallback)
-last_checkpoint = None
-training_args.max_token_length = 128
+trainer.remove_callback(MLflowCallback)
+trainer.add_callback(CustomMLflowCallback)
+is_regression = False
+last_checkpoint = get_last_checkpoint(training_args.output_dir)
+training_args.max_token_length = max_seq_length
+
     # Training
 if training_args.do_train:
     checkpoint = None
@@ -208,9 +231,11 @@ if training_args.do_train:
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
+    train_result = trainer.train(resume_from_checkpoint=None)
 
 
+
+trainer.evaluate(eval_dataset=test_set)
 # Evaluation
 if training_args.do_eval:
     logger.info("*** Evaluate ***")

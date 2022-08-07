@@ -4,3 +4,4 @@ datasets==1.14.*
 pyarrow==5.0.*
 numpy==1.21.*
 pandas
+omegaconf

@@ -73,6 +73,15 @@ class DataTrainingArguments:
             )
         },
     )
+    is_regression: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": (
+                "Whether output is Regresison or classification problem"
+                "value if set to False"
+            )
+        },
+    )
     database_name: Optional[str] = field(
         default="default", metadata={"help": "The database name to use with the table"}
     )
