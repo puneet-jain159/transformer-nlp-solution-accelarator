@@ -1,240 +1,134 @@
+
 %autoindent
-import logging
-import os
-import random
-import sys
 
-import datasets
 import numpy as np
-import mlflow
-from datasets import load_dataset, load_metric
+import datasets
+import sys
+import random
+import os
+import logging
 
-import transformers
+from functools import partial
 from transformers import (
-    AutoConfig,
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
-    HfArgumentParser,
-    PretrainedConfig,
     Trainer,
-    TrainingArguments,
     default_data_collator,
-    set_seed,
-)
-# from transformers.integrations import MLflowCallback
-
+    set_seed)
 from transformers.trainer_utils import get_last_checkpoint
-from transformers.utils import check_min_version, send_example_telemetry
-from transformers.utils.versions import require_version
+from transformers.integrations import MLflowCallback
+from datasets import load_metric, list_metrics
 
-from utils import get_config,DataTrainingArguments,ModelArguments
-from utils.callbacks import MLflowCallback
-
-parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-model_args, data_args, training_args = parser.parse_json_file("config.json")
+from nlp_sa.preprocess import preprocess_function
+from nlp_sa.ModelBuilder import ModelBuilder
+from nlp_sa.data_loader import DataLoader
+from nlp_sa import ConfLoader
+from nlp_sa.utils.callbacks import CustomMLflowCallback
+from nlp_sa.evaluate import compute_metrics
 
 logger = logging.getLogger("runner.log")
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     datefmt="%m/%d/%Y %H:%M:%S",
-    filename= "runner.log",
+    filename="runner.log",
     filemode='a')
 
-log_level = training_args.get_process_log_level()
+conf = ConfLoader()
+
+log_level = conf.training_args.log_level
 logger.setLevel(log_level)
 
-logger.warning(
-    f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-    + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
-)
-logger.info(f"Training/evaluation parameters {training_args}")
+set_seed(conf.training_args.seed)
+
+DataSet = DataLoader(conf)
+Model = ModelBuilder(conf, DataSet)
 
 
-set_seed(training_args.seed)
+# Detecting last checkpoint.
+last_checkpoint = None
+if os.path.isdir(conf.training_args.output_dir) and conf.training_args.do_train and not conf.training_args.overwrite_output_dir:
+    last_checkpoint = get_last_checkpoint(conf.training_args.output_dir)
+    if last_checkpoint is None and len(os.listdir(conf.training_args.output_dir)) > 0:
+        raise ValueError(
+            f"Output directory ({conf.training_args.output_dir}) already exists and is not empty. "
+            "Use --overwrite_output_dir to overcome."
+        )
+    elif last_checkpoint is not None and conf.training_args.resume_from_checkpoint is None:
+        logger.info(
+            f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+            "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+        )
 
-padding = "max_length"
-
-raw_datasets = load_dataset(
-    data_args.dataset_name,
-    data_args.dataset_config_name,
-    cache_dir=model_args.cache_dir,
-    use_auth_token=True if model_args.use_auth_token else None,
-)
-
-label_list = raw_datasets["train"].unique("label")
-label_list.sort()  # Let's sort it for determinism
-num_labels = len(label_list)
-
-
-config = AutoConfig.from_pretrained(
-    model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-    num_labels=num_labels,
-    finetuning_task=data_args.task_name,
-    cache_dir=model_args.cache_dir,
-    revision=model_args.model_revision,
-    use_auth_token=True if model_args.use_auth_token else None,
-)
-
-tokenizer = AutoTokenizer.from_pretrained(
-    model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-    cache_dir=model_args.cache_dir,
-    use_fast=model_args.use_fast_tokenizer,
-    revision=model_args.model_revision,
-    use_auth_token=True if model_args.use_auth_token else None,
-)
-model = AutoModelForSequenceClassification.from_pretrained(
-    model_args.model_name_or_path,
-    from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    config=config,
-    cache_dir=model_args.cache_dir,
-    revision=model_args.model_revision,
-    use_auth_token=True if model_args.use_auth_token else None,
-    ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-)
-
-non_label_column_names = [name for name in raw_datasets["train"].column_names if name != "label"]
-sentence1_key, sentence2_key = non_label_column_names[0], None
-label_to_id = {v: i for i, v in enumerate(label_list)}
-
-if label_to_id is not None:
-    model.config.label2id = label_to_id
-    model.config.id2label = {id: label for label, id in config.label2id.items()}
-elif data_args.task_name is not None and not is_regression:
-    model.config.label2id = {l: i for i, l in enumerate(label_list)}
-    model.config.id2label = {id: label for label, id in config.label2id.items()}
-
-if data_args.max_seq_length > tokenizer.model_max_length:
-    logger.warning(
-        f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
-        f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
-    )
-max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
-
-def preprocess_function(examples):
-    # Tokenize the texts
-    args = (
-        (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
-    )
-    result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
-
-    # Map labels to IDs (not necessary for GLUE tasks)
-    if label_to_id is not None and "label" in examples:
-        result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
-    return result
+preprocess = partial(preprocess_function,conf= conf, Dataset= DataSet,Model= Model)
 
 
-with training_args.main_process_first(desc="dataset map pre-processing"):
-    raw_datasets = raw_datasets.map(
-        preprocess_function,
+with conf.training_args.main_process_first( desc="dataset map train pre-processing"):
+    DataSet.train = DataSet.train.map(
+        preprocess,
         batched=True,
-        load_from_cache_file=not data_args.overwrite_cache,
-        desc="Running tokenizer on dataset",
-    )
+        # load_from_cache_file=not conf.data_args.overwrite_cache,
+        desc="Running tokenizer on test dataset")
 
-if training_args.do_train:
-    if "train" not in raw_datasets:
-        raise ValueError("--do_train requires a train dataset")
-    train_dataset = raw_datasets["train"]
-    if data_args.max_train_samples is not None:
-        max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-        train_dataset = train_dataset.select(range(max_train_samples))
 
-# if training_args.do_eval:
-#     if "validation" not in raw_datasets and "validation_matched" not in raw_datasets:
-#         raise ValueError("--do_eval requires a validation dataset")
-#     eval_dataset = raw_datasets["validation_matched" if data_args.task_name == "mnli" else "test"]
-#     if data_args.max_eval_samples is not None:
-#         max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-#         eval_dataset = eval_dataset.select(range(max_eval_samples))
+with conf.training_args.main_process_first(desc="dataset map test pre-processing"):
+    DataSet.test = DataSet.test.map(
+        preprocess,
+        batched=True,
+        # load_from_cache_file=not conf.data_args.overwrite_cache,
+        desc="Running tokenizer on dataset")
 
-    # Get the metric function
-if data_args.task_name is not None:
-    metric = load_metric("glue", data_args.task_name)
-else:
-    metric = load_metric("accuracy")
+# Get the metric function
+if conf.training_args.metric_for_best_model is not None:
+    metric = load_metric(conf.training_args.metric_for_best_model)
 
-# You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
-# predictions and label_ids field) and has to return a dictionary string to float.
-def compute_metrics(p: EvalPrediction):
-    preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-    preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
-    if data_args.task_name is not None:
-        result = metric.compute(predictions=preds, references=p.label_ids)
-        if len(result) > 1:
-            result["combined_score"] = np.mean(list(result.values())).item()
-        return result
-    elif is_regression:
-        return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
-    else:
-        return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
 
 # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
 # we already did the padding.
-if data_args.pad_to_max_length:
+if conf.data_args.pad_to_max_length:
     data_collator = default_data_collator
-elif training_args.fp16:
-    data_collator = DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8)
+elif  conf.training_args.fp16:
+    data_collator = DataCollatorWithPadding(Model.tokenizer, pad_to_multiple_of=8)
 else:
     data_collator = None
 
-eval_dataset = raw_datasets["validation_matched" if data_args.task_name == "mnli" else "test"]
+
+compute_m = partial(compute_metrics,conf = conf,metric = metric)
+
 # Initialize our Trainer
 trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset if training_args.do_train else None,
-    eval_dataset=eval_dataset if training_args.do_eval else None,
-    compute_metrics=compute_metrics,
-    tokenizer=tokenizer,
-    data_collator=data_collator,
+    model=Model.model,
+    args=conf.training_args,
+    train_dataset=DataSet.train if conf.training_args.do_train else None,
+    eval_dataset=DataSet.test if conf.training_args.do_eval else None,
+    compute_metrics=compute_m,
+    tokenizer=Model.tokenizer
 )
 
 os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = 'True'
 os.environ["MLFLOW_EXPERIMENT_NAME"] = 'banking_nlp_classifier'
-os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"bert"}'
+os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"albert-base-v2"}'
 os.environ["CREATE_MFLOW_MODEL"] = 'True'
 os.environ["MLFLOW_TRACKING_URI"] = 'sqlite:///mlflow.db'
+os.environ["MLFLOW_NESTED_RUN"] = 'True'
+os.environ["TOKENIZERS_PARALLELISM"] = 'True'
 
-trainer.add_callback(MLflowCallback)
-last_checkpoint = None
-training_args.max_token_length = 128
-    # Training
-if training_args.do_train:
-    checkpoint = None
-    if training_args.resume_from_checkpoint is not None:
-        checkpoint = training_args.resume_from_checkpoint
+trainer.remove_callback(MLflowCallback)
+trainer.add_callback(CustomMLflowCallback)
+
+conf.training_args.max_token_length = conf.data_args.max_seq_length
+
+# Training
+if conf.training_args.do_train:
+    if conf.training_args.resume_from_checkpoint is not None:
+        checkpoint = conf.training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
+    else:
+        checkpoint = None
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-
 # Evaluation
-if training_args.do_eval:
+if conf.training_args.do_eval:
     logger.info("*** Evaluate ***")
-
-    # Loop to handle MNLI double evaluation (matched, mis-matched)
-    tasks = [data_args.task_name]
-    eval_datasets = [eval_dataset]
-    if data_args.task_name == "mnli":
-        tasks.append("mnli-mm")
-        eval_datasets.append(raw_datasets["validation_mismatched"])
-        combined = {}
-
-    for eval_dataset, task in zip(eval_datasets, tasks):
-        metrics = trainer.evaluate(eval_dataset=eval_dataset)
-
-        max_eval_samples = (
-            data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
-        )
-        metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
-
-        if task == "mnli-mm":
-            metrics = {k + "_mm": v for k, v in metrics.items()}
-        if task is not None and "mnli" in task:
-            combined.update(metrics)
-
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", combined if task is not None and "mnli" in task else metrics)
+    trainer.evaluate(eval_dataset=DataSet.test)
