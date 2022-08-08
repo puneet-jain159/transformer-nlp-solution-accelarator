@@ -192,9 +192,9 @@ class CustomMLflowCallback(TrainerCallback):
 
         if self._create_model:
             logger.debug("Creating Custom Pyfunc Model")
-            cpu_model = model.to('cpu')
+            model = model.to("cuda" if args.n_gpu > 0 else "cpu")
             transformer_model = TransformerModel(tokenizer=tokenizer,
-                                                 model=cpu_model,
+                                                 model=model,
                                                  max_token_length=args.max_token_length)
 
             # Create conda environment
@@ -228,9 +228,9 @@ class CustomMLflowCallback(TrainerCallback):
 
             if self._create_model:
                 logger.info("Creating Custom Pyfunc Model")
-                cpu_model = model.to('cpu')
+                model = model.to("cuda" if args.n_gpu > 0 else "cpu")
                 transformer_model = TransformerModel(tokenizer=tokenizer,
-                                                     model=cpu_model,
+                                                     model=model,
                                                      max_token_length=args.max_token_length)
 
                 # Create conda environment

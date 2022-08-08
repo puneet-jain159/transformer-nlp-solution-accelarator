@@ -68,7 +68,7 @@ class ModelBuilder:
             cache_dir=self.conf.model_args.cache_dir,
             revision=self.conf.model_args.model_revision,
             use_auth_token=True if self.conf.model_args.use_auth_token else None,
-            ignore_mismatched_sizes=self.conf.model_args.ignore_mismatched_sizes)
+            ignore_mismatched_sizes=self.conf.model_args.ignore_mismatched_sizes).to("cuda" if self.conf.training_args.n_gpu > 0 else "cpu")
     
 
 
