@@ -109,7 +109,7 @@ class DataTrainingArguments:
             self.task_name = self.task_name.lower()
             if self.task_name not in task_to_keys.keys():
                 raise ValueError("Unknown task, you should pick one in " + ",".join(task_to_keys.keys()))
-        if self.dataset_name is not None or self.train_table is not None or self.validation_table is not None:
+        if self.dataset_name is not None and self.train_table is not None and self.validation_table is not None:
             raise ValueError("Either dataset name or a training/validation table should ne specified" )
         if self.dataset_name is not None:
             pass

@@ -1,7 +1,7 @@
-torch==1.10.*
-transformers==4.11.*
-datasets==1.14.*
-pyarrow==5.0.*
-numpy==1.21.*
+torch
+transformers
+datasets
+pyarrow
+numpy
 pandas
 omegaconf
