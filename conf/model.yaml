@@ -1,5 +1,5 @@
 model_name_or_path : albert-base-v2
-experiment_location : /Shared/transformer_experiments/classification_experiments
+experiment_location : /Users/puneet.jain@databricks.com/banking_classifier
 run_name: banking_test_run
 task_name: multi-class
 
@@ -8,7 +8,7 @@ log_level: debug
 do_train: true
 do_eval: true
 
-dataset_name: banking77
+# dataset_name: banking77
 
 database_name: default
 train_table: banking77_train
@@ -29,4 +29,4 @@ load_best_model_at_end: true
 metric_for_best_model: accuracy
 num_train_epochs: 10
 seed: 123
-output_dir: tmp/albert
+output_dir: /dbfs/puneet.jain@databricks.com/transformers/albert

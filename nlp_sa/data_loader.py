@@ -66,9 +66,9 @@ class DataLoader:
             if self.conf.data_args.validation_table:
                 logger.debug(
                     f"Loading the data validation table from: {self.conf.data_args.validation_table}")
-                train = self.spark.read.table(f"{self.conf.data_args.database_name}.{self.conf.data_args.validation_table}")
-                validation = train.toPandas()
-                self.train = Dataset.from_pandas(validation)
+                test = self.spark.read.table(f"{self.conf.data_args.database_name}.{self.conf.data_args.validation_table}")
+                test = test.toPandas()
+                self.test = Dataset.from_pandas(test)
     
     def get_num_class(self):
         '''
@@ -78,7 +78,8 @@ class DataLoader:
             is_regression = self.conf.data_args.task_name == "stsb"
             #ToDo change the label_col to label_names
             if not is_regression:
-                self.label_list = self.train.features[self.conf.data_args.label_col].names
+                self.label_list = self.train.unique(self.conf.data_args.label_col)
+                self.label_list.sort()  # Let's sort it for determinism
                 self.num_labels = len(self.label_list)
             else:
                 self.num_labels = 1
