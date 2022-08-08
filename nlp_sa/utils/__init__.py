@@ -6,6 +6,10 @@ from typing import List, Tuple, Dict
 from dataclasses import dataclass, field
 from typing import Optional
 
+task_to_keys = {
+    "multi-class": ("sentence", None),
+}
+
 @dataclass
 class DataTrainingArguments:
     """
@@ -73,12 +77,19 @@ class DataTrainingArguments:
             )
         },
     )
-    is_regression: Optional[bool] = field(
-        default=False,
+    label_col: Optional[str] = field(
+        default="label",
         metadata={
             "help": (
-                "Whether output is Regresison or classification problem"
-                "value if set to False"
+                "the name of the label_Column"
+            )
+        },
+    )
+    feature_col: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "the name of the label_Column"
             )
         },
     )
@@ -98,7 +109,9 @@ class DataTrainingArguments:
             self.task_name = self.task_name.lower()
             if self.task_name not in task_to_keys.keys():
                 raise ValueError("Unknown task, you should pick one in " + ",".join(task_to_keys.keys()))
-        elif self.dataset_name is not None:
+        if self.dataset_name is not None or self.train_table is not None or self.validation_table is not None:
+            raise ValueError("Either dataset name or a training/validation table should ne specified" )
+        if self.dataset_name is not None:
             pass
         elif self.train_table is None or self.validation_table is None:
             raise ValueError("Need either a GLUE task, a training/validation table or a dataset name.")
@@ -118,6 +131,9 @@ class ModelArguments:
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    )
+    is_regression: Optional[bool] = field(
+        default=False, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
