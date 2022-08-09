@@ -43,14 +43,22 @@ class ModelBuilder:
         '''
         Function to load tokenizer by specifying location or path in the config
         '''
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.conf.model_args.tokenizer_name if self.conf.model_args.tokenizer_name else self.conf.model_args.model_name_or_path,
-            cache_dir=self.conf.model_args.cache_dir,
-            use_fast=self.conf.model_args.use_fast_tokenizer,
-            revision=self.conf.model_args.model_revision,
-            use_auth_token=True if self.conf.model_args.use_auth_token else None,
-        )
-
+        if self.config.model_type in {"gpt2", "roberta"}:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.conf.model_args.tokenizer_name if self.conf.model_args.tokenizer_name else self.conf.model_args.model_name_or_path,
+                cache_dir=self.conf.model_args.cache_dir,
+                use_fast=self.conf.model_args.use_fast_tokenizer,
+                revision=self.conf.model_args.model_revision,
+                use_auth_token=True if self.conf.model_args.use_auth_token else None,
+                add_prefix_space=True)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.conf.model_args.tokenizer_name if self.conf.model_args.tokenizer_name else self.conf.model_args.model_name_or_path,
+                cache_dir=self.conf.model_args.cache_dir,
+                use_fast=self.conf.model_args.use_fast_tokenizer,
+                revision=self.conf.model_args.model_revision,
+                use_auth_token=True if self.conf.model_args.use_auth_token else None)
+            
         # Correct the sequence length incase of any mismatch
         if self.conf.data_args.max_seq_length > self.tokenizer.model_max_length:
             logger.warning(

@@ -1,4 +1,4 @@
-model_name_or_path : distilbert-base-uncased
+model_name_or_path : distilroberta-base
 experiment_location : /Users/puneet.jain@databricks.com/ner_bio
 run_name: ner_bionlp_2004
 task_name: ner
@@ -33,4 +33,4 @@ evaluate_metric: seqeval
 
 num_train_epochs: 10
 seed: 123
-output_dir: /dbfs/puneet.jain@databricks.com/transformers/distil_bert_uncased
+output_dir: /dbfs/puneet.jain@databricks.com/transformers/distil_roberta_uncased

@@ -36,7 +36,7 @@ log4jLogger = sc._jvm.org.apache.log4j
 logger = log4jLogger.LogManager.getLogger("runner")
 logger.info("pyspark script logger initialized")
 
-conf = ConfLoader()
+conf = ConfLoader('conf/model_multi_class.yaml')
 # log_level = conf.training_args.log_level
 # logger.setLevel(log_level)
 
@@ -47,7 +47,7 @@ Model = ModelBuilder(conf, DataSet)
 
 # COMMAND ----------
 
-! rm -r /dbfs/puneet.jain@databricks.com/transformers/distil_bert_uncased
+! rm -r /dbfs/puneet.jain@databricks.com/transformers/xlm-roberta-base
 
 # COMMAND ----------
 
@@ -109,8 +109,7 @@ trainer = Trainer(
     train_dataset=DataSet.train if conf.training_args.do_train else None,
     eval_dataset=DataSet.test if conf.training_args.do_eval else None,
     compute_metrics=compute_m,
-    tokenizer=Model.tokenizer,
-    data_collator = data_collator
+    tokenizer=Model.tokenizer
 )
 
 # COMMAND ----------
