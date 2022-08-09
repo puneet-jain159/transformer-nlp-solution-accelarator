@@ -17,6 +17,7 @@ from transformers import (
     EvalPrediction,
     Trainer,
     default_data_collator,
+  DataCollatorForTokenClassification,
     set_seed)
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import MLflowCallback
@@ -36,8 +37,8 @@ logger = log4jLogger.LogManager.getLogger("runner")
 logger.info("pyspark script logger initialized")
 
 conf = ConfLoader()
-log_level = conf.training_args.log_level
-logger.setLevel(log_level)
+# log_level = conf.training_args.log_level
+# logger.setLevel(log_level)
 
 set_seed(conf.training_args.seed)
 
@@ -46,7 +47,7 @@ Model = ModelBuilder(conf, DataSet)
 
 # COMMAND ----------
 
-! rm -r /dbfs/puneet.jain@databricks.com/transformers/albert
+! rm -r /dbfs/puneet.jain@databricks.com/transformers/distil_bert_uncased
 
 # COMMAND ----------
 
@@ -85,7 +86,7 @@ with conf.training_args.main_process_first(desc="dataset map test pre-processing
 
 # Get the metric function
 if conf.training_args.metric_for_best_model is not None:
-    metric = load_metric(conf.training_args.metric_for_best_model)
+    metric = load_metric("seqeval")
 
 
 # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
@@ -98,8 +99,9 @@ else:
     data_collator = None
 
 
-compute_m = partial(compute_metrics,conf = conf,metric = metric)
+compute_m = partial(compute_metrics,conf = conf,metric = metric,Dataset = DataSet)
 
+# data_collator = DataCollatorForTokenClassification(Model.tokenizer, pad_to_multiple_of=8 if conf.training_args.fp16 else None)
 # Initialize our Trainer
 trainer = Trainer(
     model=Model.model,
@@ -107,14 +109,15 @@ trainer = Trainer(
     train_dataset=DataSet.train if conf.training_args.do_train else None,
     eval_dataset=DataSet.test if conf.training_args.do_eval else None,
     compute_metrics=compute_m,
-    tokenizer=Model.tokenizer
+    tokenizer=Model.tokenizer,
+    data_collator = data_collator
 )
 
 # COMMAND ----------
 
 os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = 'True'
-os.environ["MLFLOW_EXPERIMENT_NAME"] = "/Users/puneet.jain@databricks.com/banking_classifier"
-os.environ["MLFLOW_TAGS"] = '{"custom_tag" : "puneet" ,"model":"albert-base-v2"}'
+os.environ["MLFLOW_EXPERIMENT_NAME"] = conf.model_args.experiment_location
+os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"bert_base_uncased","task_name" : "ner"}'
 os.environ["CREATE_MFLOW_MODEL"] = 'True'
 os.environ["MLFLOW_NESTED_RUN"] = 'True'
 os.environ["TOKENIZERS_PARALLELISM"] = 'True'

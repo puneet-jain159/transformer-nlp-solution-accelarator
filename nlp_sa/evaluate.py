@@ -5,12 +5,12 @@ from transformers import EvalPrediction
 # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
 # predictions and label_ids field) and has to return a dictionary string to float.
 
-def compute_metrics(p: EvalPrediction,conf,metric):
+def compute_metrics(p: EvalPrediction,conf,metric,Dataset):
     if conf.data_args.task_name is not None:
         if conf.data_args.task_name == 'multi-class':
-            result = _compute_metrics_multi_class(EvalPrediction,conf,metric)
+            result = _compute_metrics_multi_class(p,conf,metric)
         elif conf.data_args.task_name == 'ner':
-            result = _compute_metrics_ner(EvalPrediction,conf,metric)
+            result = _compute_metrics_ner(p,conf,metric,Dataset)
         else:
             raise ValueError("task not implemented please implement the task")
     return result
@@ -32,7 +32,7 @@ def _compute_metrics_multi_class(p: EvalPrediction,conf,metric):
 
 
 
-def _compute_metrics_ner(p: EvalPrediction,conf,metric):
+def _compute_metrics_ner(p,conf,metric,Dataset):
     """
     Function to compute the metric of NER Task
     """
@@ -41,11 +41,11 @@ def _compute_metrics_ner(p: EvalPrediction,conf,metric):
 
     # Remove ignored index (special tokens)
     true_predictions = [
-        [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+        [Dataset.label_list[p] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
     true_labels = [
-        [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+        [Dataset.label_list[l] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
 
