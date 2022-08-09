@@ -101,6 +101,10 @@ else:
 
 compute_m = partial(compute_metrics,conf = conf,metric = metric,Dataset = DataSet)
 
+# 
+conf.training_args.max_token_length = conf.data_args.max_seq_length
+conf.training_args.save_as_cpu_model = True
+
 # data_collator = DataCollatorForTokenClassification(Model.tokenizer, pad_to_multiple_of=8 if conf.training_args.fp16 else None)
 # Initialize our Trainer
 trainer = Trainer(
@@ -124,7 +128,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = 'True'
 trainer.remove_callback(MLflowCallback)
 trainer.add_callback(CustomMLflowCallback)
 
-conf.training_args.max_token_length = conf.data_args.max_seq_length
 
 # Training
 if conf.training_args.do_train:
@@ -143,7 +146,7 @@ if conf.training_args.do_eval:
 
 # COMMAND ----------
 
-conf.model_args.experiment_location
+
 
 # COMMAND ----------
 

@@ -1,6 +1,6 @@
-model_name_or_path : xlm-roberta-base
+model_name_or_path : bert-large-uncased
 experiment_location : /Users/puneet.jain@databricks.com/banking_classifier
-run_name: banking_test_run
+run_name: bert-large-uncased
 task_name: multi-class
 
 log_level: debug
