@@ -1,4 +1,3 @@
-
 %autoindent
 
 import numpy as np
@@ -25,6 +24,8 @@ from nlp_sa.data_loader import DataLoader
 from nlp_sa import ConfLoader
 from nlp_sa.utils.callbacks import CustomMLflowCallback
 from nlp_sa.evaluate import compute_metrics
+
+
 
 logger = logging.getLogger("runner.log")
 
@@ -60,15 +61,16 @@ if os.path.isdir(conf.training_args.output_dir) and conf.training_args.do_train 
             "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
         )
 
-preprocess = partial(preprocess_function,conf= conf, Dataset= DataSet,Model= Model)
+preprocess = partial(preprocess_function, conf=conf,
+                     Dataset=DataSet, Model=Model)
 
 
-with conf.training_args.main_process_first( desc="dataset map train pre-processing"):
+with conf.training_args.main_process_first(desc="dataset map train pre-processing"):
     DataSet.train = DataSet.train.map(
         preprocess,
         batched=True,
         # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on test dataset")
+        desc="Running tokenizer on train dataset")
 
 
 with conf.training_args.main_process_first(desc="dataset map test pre-processing"):
@@ -76,7 +78,7 @@ with conf.training_args.main_process_first(desc="dataset map test pre-processing
         preprocess,
         batched=True,
         # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on dataset")
+        desc="Running tokenizer on test dataset")
 
 # Get the metric function
 if conf.training_args.metric_for_best_model is not None:
@@ -87,13 +89,14 @@ if conf.training_args.metric_for_best_model is not None:
 # we already did the padding.
 if conf.data_args.pad_to_max_length:
     data_collator = default_data_collator
-elif  conf.training_args.fp16:
-    data_collator = DataCollatorWithPadding(Model.tokenizer, pad_to_multiple_of=8)
+elif conf.training_args.fp16:
+    data_collator = DataCollatorWithPadding(
+        Model.tokenizer, pad_to_multiple_of=8)
 else:
     data_collator = None
 
 
-compute_m = partial(compute_metrics,conf = conf,metric = metric)
+compute_m = partial(compute_metrics, conf=conf, metric=metric)
 
 # Initialize our Trainer
 trainer = Trainer(
@@ -106,8 +109,8 @@ trainer = Trainer(
 )
 
 os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = 'True'
-os.environ["MLFLOW_EXPERIMENT_NAME"] = 'banking_nlp_classifier'
-os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"albert-base-v2"}'
+os.environ["MLFLOW_EXPERIMENT_NAME"] = conf.model_args.experiment_location
+os.environ["MLFLOW_TAGS"] = '{"runner" : "puneet" ,"model":"bert_base_uncased","task_name" : "ner"}'
 os.environ["CREATE_MFLOW_MODEL"] = 'True'
 os.environ["MLFLOW_TRACKING_URI"] = 'sqlite:///mlflow.db'
 os.environ["MLFLOW_NESTED_RUN"] = 'True'
@@ -132,3 +135,6 @@ if conf.training_args.do_train:
 if conf.training_args.do_eval:
     logger.info("*** Evaluate ***")
     trainer.evaluate(eval_dataset=DataSet.test)
+
+
+

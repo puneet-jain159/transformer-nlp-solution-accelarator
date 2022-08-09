@@ -1,22 +1,23 @@
-model_name_or_path : albert-base-v2
-experiment_location : /Users/puneet.jain@databricks.com/banking_classifier
-run_name: banking_test_run
-task_name: multi-class
+model_name_or_path : distilbert-base-uncased
+experiment_location : /Users/puneet.jain@databricks.com/ner_bio
+run_name: ner_bionlp_2004
+task_name: ner
 
 log_level: debug
 
 do_train: true
 do_eval: true
 
-# dataset_name: banking77
+dataset_name: tner/bionlp2004
 
-database_name: default
-train_table: banking77_train
-validation_table: banking77_test
+# database_name: default
+# train_table: banking77_train
+# validation_table: banking77_test
 
 
-feature_col: text
-label_col: label
+feature_col: tokens
+label_col: tags
+label_all_tokens: true
 
 
 max_seq_length: 512
@@ -26,7 +27,7 @@ per_device_eval_batch_size: 32
 evaluation_strategy: epoch
 save_strategy: epoch
 load_best_model_at_end: true
-metric_for_best_model: accuracy
+metric_for_best_model: seqeval
 num_train_epochs: 10
 seed: 123
-output_dir: /dbfs/puneet.jain@databricks.com/transformers/albert
+output_dir: tmp/distilbert-base-uncased
