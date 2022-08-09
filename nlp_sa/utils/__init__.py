@@ -187,6 +187,11 @@ class ModelArguments:
         metadata={
             "help": "Will enable to load a pretrained model whose head dimensions are different."},
     )
+    evaluate_metric: str = field(
+        default="seqeval",
+        metadata={
+            "help": "Metric to use with evaluate sequence"},
+    )
 
 
 def get_config(config_file: str) -> Namespace:

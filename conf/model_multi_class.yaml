@@ -1,0 +1,35 @@
+model_name_or_path : albert-base-v2
+experiment_location : /Users/puneet.jain@databricks.com/banking_classifier
+run_name: banking_test_run
+task_name: multi-class
+
+log_level: debug
+
+do_train: true
+do_eval: true
+
+# dataset_name: banking77
+
+database_name: default
+train_table: banking77_train
+validation_table: banking77_test
+
+
+feature_col: text
+label_col: label
+
+
+max_seq_length: 256
+learning_rate: 0.00003
+per_device_train_batch_size: 32
+per_device_eval_batch_size: 32
+evaluation_strategy: epoch
+save_strategy: epoch
+load_best_model_at_end: true
+
+metric_for_best_model: accuracy
+evaluate_metric: seqeval
+
+num_train_epochs: 10
+seed: 123
+output_dir: /dbfs/puneet.jain@databricks.com/transformers/albert

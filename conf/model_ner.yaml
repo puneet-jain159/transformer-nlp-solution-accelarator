@@ -27,7 +27,10 @@ per_device_eval_batch_size: 32
 evaluation_strategy: epoch
 save_strategy: epoch
 load_best_model_at_end: true
+
 metric_for_best_model: f1
+evaluate_metric: seqeval
+
 num_train_epochs: 10
 seed: 123
 output_dir: /dbfs/puneet.jain@databricks.com/transformers/distil_bert_uncased
