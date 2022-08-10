@@ -5,3 +5,4 @@ pyarrow
 numpy
 pandas
 omegaconf
+seqeval

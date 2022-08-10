@@ -4,12 +4,13 @@ import importlib.util
 import json
 import numbers
 import os
+from glob import glob
 import sys
 import tempfile
 from pathlib import Path
 from .custom_func import TransformerModel
 
-from transformers.utils import flatten_dict,logging, ENV_VARS_TRUE_VALUES, is_torch_tpu_available
+from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES, is_torch_tpu_available
 
 
 logger = logging.get_logger(__name__)
@@ -98,7 +99,8 @@ class CustomMLflowCallback(TrainerCallback):
                     f"MLflow run started with run_id={self._ml_flow.active_run().info.run_id}")
                 if self._parent_run_id is None:
                     self._parent_run_id = self._ml_flow.active_run().info.run_id
-                    logger.warning(f"setting parent run id {str(self._parent_run_id)}")
+                    logger.warning(
+                        f"setting parent run id {str(self._parent_run_id)}")
                 self._auto_end_run = True
             combined_dict = args.to_dict()
             if hasattr(model, "config") and model.config is not None:
@@ -192,7 +194,9 @@ class CustomMLflowCallback(TrainerCallback):
 
         if self._create_model:
             logger.debug("Creating Custom Pyfunc Model")
-            model = model.to("cuda" if args.n_gpu > 0 else "cpu")
+            
+            if args.save_as_cpu_model:
+                model = model.to("cpu")
             transformer_model = TransformerModel(tokenizer=tokenizer,
                                                  model=model,
                                                  max_token_length=args.max_token_length)
@@ -207,10 +211,16 @@ class CustomMLflowCallback(TrainerCallback):
 
             input_example = train_dataloader.dataset.data[:5].to_pandas()
 
+            # get the code
+            path = [f'{os.getcwd()}/nlp_sa',f'{os.getcwd()}/conf']
+
             self._ml_flow.pyfunc.log_model("mlflow_model",
                                            python_model=transformer_model,
                                            conda_env=model_env,
+                                           code_path = path,
                                            input_example=input_example)
+            
+            model = model.to("cuda" if args.n_gpu > 0 else "cpu")
 
     def on_train_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
 
@@ -228,7 +238,10 @@ class CustomMLflowCallback(TrainerCallback):
 
             if self._create_model:
                 logger.info("Creating Custom Pyfunc Model")
-                model = model.to("cuda" if args.n_gpu > 0 else "cpu")
+                
+                if args.save_as_cpu_model:
+                    model = model.to("cpu")
+
                 transformer_model = TransformerModel(tokenizer=tokenizer,
                                                      model=model,
                                                      max_token_length=args.max_token_length)
@@ -243,11 +256,16 @@ class CustomMLflowCallback(TrainerCallback):
 
                 input_example = train_dataloader.dataset.data[:5].to_pandas()
 
-                self._ml_flow.pyfunc.log_model("mlflow_model",
-                                               python_model=transformer_model,
-                                               conda_env=model_env,
-                                               input_example=input_example)
+                # get the code
+                path = [f'{os.getcwd()}/nlp_sa',f'{os.getcwd()}/conf']
 
+                self._ml_flow.pyfunc.log_model("mlflow_model",
+                                            python_model=transformer_model,
+                                            conda_env=model_env,
+                                            code_path = path,
+                                            input_example=input_example)
+                
+                model = model.to("cuda" if args.n_gpu > 0 else "cpu")
 
     def on_evaluate(self, args, state, control, **kwargs):
         """
@@ -255,7 +273,7 @@ class CustomMLflowCallback(TrainerCallback):
         """
         logger.debug("Evaluate has been called")
         if (self._auto_end_run and self._ml_flow.active_run()
-            and (self._parent_run_id == self._ml_flow.active_run().info.run_id)):
+                and (self._parent_run_id == self._ml_flow.active_run().info.run_id)):
             logger.debug("terminating parent run")
             self._ml_flow.end_run()
 
