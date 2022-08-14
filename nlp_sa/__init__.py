@@ -12,9 +12,12 @@ from transformers import (
 )
 
 from transformers.utils import logging
-from .utils import get_config, DataTrainingArguments, ModelArguments
+from .utils import get_config
+from .utils.arguements import DataTrainingArguments, ModelArguments
 
 logger = logging.get_logger(__name__)
+
+__version__ = "0.0.1"
 
 class ConfLoader:
     def __init__(

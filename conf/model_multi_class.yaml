@@ -1,6 +1,6 @@
-model_name_or_path : bert-large-uncased
+model_name_or_path : xlm-roberta-large
 experiment_location : /Users/puneet.jain@databricks.com/banking_classifier
-run_name: bert-large-uncased
+run_name: xlm-roberta-large
 task_name: multi-class
 
 log_level: debug
@@ -20,9 +20,9 @@ label_col: label
 
 
 max_seq_length: 256
-learning_rate: 0.00003
-per_device_train_batch_size: 32
-per_device_eval_batch_size: 32
+learning_rate: 0.000004
+per_device_train_batch_size: 8
+per_device_eval_batch_size: 8
 evaluation_strategy: epoch
 save_strategy: epoch
 load_best_model_at_end: true

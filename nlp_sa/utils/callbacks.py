@@ -199,7 +199,8 @@ class CustomMLflowCallback(TrainerCallback):
                 model = model.to("cpu")
             transformer_model = TransformerModel(tokenizer=tokenizer,
                                                  model=model,
-                                                 max_token_length=args.max_token_length)
+                                                 max_token_length=args.max_token_length,
+                                                 task_name = args.task_name)
 
             # Create conda environment
             with open('requirements.txt', 'r') as additional_requirements:
@@ -244,7 +245,8 @@ class CustomMLflowCallback(TrainerCallback):
 
                 transformer_model = TransformerModel(tokenizer=tokenizer,
                                                      model=model,
-                                                     max_token_length=args.max_token_length)
+                                                     max_token_length=args.max_token_length,
+                                                     task_name = args.task_name)
 
                 # Create conda environment
                 with open('requirements.txt', 'r') as additional_requirements:

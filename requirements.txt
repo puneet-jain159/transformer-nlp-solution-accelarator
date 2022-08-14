@@ -6,3 +6,9 @@ numpy
 pandas
 omegaconf
 seqeval
+setuptools
+wheel
+pyyaml
+pytest
+pytest-cov
+dbx
