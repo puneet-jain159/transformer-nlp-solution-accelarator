@@ -104,6 +104,7 @@ compute_m = partial(compute_metrics,conf = conf,metric = metric,Dataset = DataSe
 # 
 conf.training_args.max_token_length = conf.data_args.max_seq_length
 conf.training_args.save_as_cpu_model = True
+conf.training_args.task_name = conf.data_args.task_name
 
 # data_collator = DataCollatorForTokenClassification(Model.tokenizer, pad_to_multiple_of=8 if conf.training_args.fp16 else None)
 # Initialize our Trainer
