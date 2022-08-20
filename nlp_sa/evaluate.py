@@ -1,17 +1,21 @@
+"""
+This module contains helper functions for computing model metrics.
+
+You can define your custom compute_metrics function.
+It takes an `EvalPrediction` object (a named tuple with a predictions
+and label_ids field) and has to return a dictionary string to float.
+"""
+
 import numpy as np
 from transformers import EvalPrediction
 
 
-# You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
-# predictions and label_ids field) and has to return a dictionary string to float.
-
-
-def compute_metrics(p: EvalPrediction, conf, metric, Dataset):
+def compute_metrics(p: EvalPrediction, conf, metric, dataset):
     if conf.data_args.task_name is not None:
         if conf.data_args.task_name == "multi-class":
             result = _compute_metrics_multi_class(p, conf, metric)
         elif conf.data_args.task_name == "ner":
-            result = _compute_metrics_ner(p, conf, metric, Dataset)
+            result = _compute_metrics_ner(p, conf, metric, dataset)
         else:
             raise ValueError(
                 "task not implemented please implement the task"
@@ -40,7 +44,7 @@ def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
                     final_results[key] = value
             return final_results
         elif conf.model_args.is_regression:
-            return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
+            return {"mse": ((predictions - p.label_ids) ** 2).mean().item()}
         else:
             return {
                 "precision": result["overall_precision"],
@@ -57,34 +61,28 @@ def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
         raise ValueError("task name not defined")
 
 
-def _compute_metrics_ner(p, conf, metric, Dataset):
+def _compute_metrics_ner(
+    examples,
+    conf,
+    metric,
+    dataset,
+    special_token_ids=[-100]
+):
     """
     Function to compute the metric of NER Task
     """
-    predictions, labels = p
+    predictions, labels = examples
     predictions = np.argmax(predictions, axis=2)
 
     # Remove ignored index (special tokens)
-    true_predictions = [
-        [
-            Dataset.label_list[p]
-            for (p, l) in zip(prediction, label)
-            if l != -100
-        ]
-        for prediction, label in zip(predictions, labels)
-    ]
-    true_labels = [
-        [
-            Dataset.label_list[l]
-            for (p, l) in zip(prediction, label)
-            if l != -100
-        ]
-        for prediction, label in zip(predictions, labels)
-    ]
+    for special_token in special_token_ids:
+        predictions.remove(special_token)
+        labels.remove(special_token)
 
     results = metric.compute(
-        predictions=true_predictions, references=true_labels
+        predictions=predictions, references=labels
     )
+
     if conf.data_args.return_entity_level_metrics:
         # Unpack nested dictionaries
         final_results = {}
