@@ -22,6 +22,8 @@ class DataLoader:
         database_name = None,
         do_eval = True,
         do_train = True,
+        train_split = "train",
+        eval_split = "test",
         train_table = None,
         validation_table = None,
         spark = None
@@ -37,6 +39,8 @@ class DataLoader:
         self._database_name = database_name
         self._do_eval = do_eval
         self._do_train = do_train
+        self._train_split = train_split
+        self._eval_split = eval_split
         self._train_table = train_table
         self._validation_table = validation_table
         self._spark = spark
@@ -49,6 +53,21 @@ class DataLoader:
             )
 
         self._load_dataset()
+
+    def _get_label_col(self):
+
+        feature_set = None
+        if self._do_train:
+            feature_set = self.train.features
+        elif self._do_eval:
+            feature_set = self.test.features
+
+        for feature_id in feature_set.keys():
+            if isinstance(
+                feature_set[feature_id],
+                ClassLabel
+            ):
+                return feature_id
 
     def _load_dataset(self):
         """
@@ -64,7 +83,7 @@ class DataLoader:
                 self.train = load_dataset(
                     path = self._dataset_name,
                     download_config = self._dataset_config_name,
-                    split="train",
+                    split=self._train_split,
                     cache_dir=self._cache_dir,
                     use_auth_token=self._use_auth_token
                 )
@@ -80,10 +99,9 @@ class DataLoader:
 
             if self._do_eval:
                 self.test = load_dataset(
-                    dataset_name = self._dataset_name,
+                    path = self._dataset_name,
                     download_config = self._dataset_config_name,
-                    subset = self._subset,
-                    split="test",
+                    split=self._eval_split,
                     cache_dir=self._cache_dir,
                     use_auth_token=self._use_auth_token
                 )
@@ -94,6 +112,9 @@ class DataLoader:
                     self._max_eval_samples,
                 )
                 self.test = self.test.select(range(max_eval_samples))
+
+            self._label_col = self._get_label_col()
+
 
         elif self._database_name:
             logger.debug(
@@ -133,12 +154,12 @@ class DataLoader:
             is_regression = self.conf.data_args.task_name == "stsb"
             # ToDo change the label_col to label_names
             if not is_regression:
-                if self.conf.data_args.task_name == "multi-class":
-                    self.num_labels = (
+                if self._task_name == "multi-class":
+                    self._num_labels = (
                         self._get_num_class_multi_class()
                     )
                 elif self.conf.data_args.task_name == "ner":
-                    self.num_labels = self._get_num_class_ner()
+                    self._num_labels = self._get_num_class_ner()
             else:
                 self.num_labels = 1
         else:
@@ -158,12 +179,13 @@ class DataLoader:
         """
         Function to get num of classes for mult-class
         """
-        self.label_list = self.train.unique(
-            self.conf.data_args.label_col
+
+        self._label_list = self.train.unique(
+            self._label_col
         )
         # Let's sort it for determinism
-        self.label_list.sort()
-        return len(self.label_list)
+        self._label_list.sort()
+        return len(self._label_list)
 
     def _get_num_class_ner(self):
         """
@@ -176,23 +198,23 @@ class DataLoader:
 
         labels_are_int = isinstance(
             self.train.features[
-                self.conf.data_args.label_col
+                self._label_col
             ].feature,
             ClassLabel,
         )
         if labels_are_int:
-            self.label_list = self.train.features[
-                self.conf.data_args.label_col
+            self._label_list = self.train.features[
+                self._label_col
             ].feature.names
-            self.label_to_id = {
-                i: i for i in range(len(self.label_list))
+            self._label_to_id = {
+                i: i for i in range(len(self._label_list))
             }
         else:
-            self.label_list = get_label_list(
-                self.train[self.conf.data_args.label_col]
+            self._label_list = get_label_list(
+                self.train[self._label_col]
             )
-            self.label_to_id = {
-                l: i for i, l in enumerate(self.label_list)
+            self._label_to_id = {
+                l: i for i, l in enumerate(self._label_list)
             }
 
-        return len(self.label_list)
+        return len(self._label_list)
