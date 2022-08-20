@@ -1,14 +1,10 @@
 torch
 transformers
 datasets
-pyarrow
 numpy
 pandas
-omegaconf
 seqeval
 setuptools
 wheel
-pyyaml
 pytest
 pytest-cov
-dbx

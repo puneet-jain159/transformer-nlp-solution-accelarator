@@ -1,8 +1,9 @@
+import logging
+
 from datasets import load_dataset, Dataset, ClassLabel
-from transformers.utils import logging
 from .utils import get_label_list
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class DataLoader:
@@ -10,11 +11,43 @@ class DataLoader:
     Helper class to download the data to Fine-Tune and Train the Data
     """
 
-    def __init__(self, conf, spark=None):
-        self.conf = conf
-        self.spark = spark
-        self.num_labels = None
-        self.label_list = None
+    def __init__(
+        self,
+        dataset_name,
+        dataset_config_name = None,
+        cache_dir = "/tmp/",
+        use_auth_token = None,
+        max_train_samples = None,
+        max_eval_samples = None,
+        database_name = None,
+        do_eval = True,
+        do_train = True,
+        train_table = None,
+        validation_table = None,
+        spark = None
+    ):
+        self._dataset_name = dataset_name
+        self._dataset_config_name = dataset_config_name
+        self._num_labels = None
+        self._label_list = None
+        self._cache_dir = cache_dir
+        self._use_auth_token = use_auth_token
+        self._max_train_samples = max_train_samples
+        self._max_eval_samples = max_eval_samples
+        self._database_name = database_name
+        self._do_eval = do_eval
+        self._do_train = do_train
+        self._train_table = train_table
+        self._validation_table = validation_table
+        self._spark = spark
+
+        if ((self._database_name and not self._spark) or 
+        (self._spark and not self._database_name)):
+            raise ValueError(
+                """Invalid arguments - make sure to pass a Spark session
+                object if you want to read data from a Hive Table using Spark"""
+            )
+
         self._load_dataset()
 
     def _load_dataset(self):
@@ -22,75 +55,72 @@ class DataLoader:
         Function to load data from Delta table or HuggingFace DataSet
         """
 
-        if self.conf.data_args.dataset_name:
+        if self._dataset_name:
             logger.debug(
                 f"""Loading the dataset from hugging face dataset:
-                {self.conf.data_args.dataset_name}"""
+                {self._dataset_name}"""
             )
-            if self.conf.training_args.do_train:
+            if self._do_train:
                 self.train = load_dataset(
-                    self.conf.data_args.dataset_name,
-                    self.conf.data_args.dataset_config_name,
+                    path = self._dataset_name,
+                    download_config = self._dataset_config_name,
                     split="train",
-                    cache_dir=self.conf.model_args.cache_dir,
-                    use_auth_token=True
-                    if self.conf.model_args.use_auth_token
-                    else None,
+                    cache_dir=self._cache_dir,
+                    use_auth_token=self._use_auth_token
                 )
 
-            if self.conf.data_args.max_train_samples is not None:
+            if self._max_train_samples is not None:
                 max_train_samples = min(
-                    len(self.traint),
-                    self.conf.data_args.max_train_samples,
+                    len(self.train),
+                    self._max_train_samples,
                 )
                 self.train = self.train.select(
                     range(max_train_samples)
                 )
 
-            if self.conf.training_args.do_eval:
+            if self._do_eval:
                 self.test = load_dataset(
-                    self.conf.data_args.dataset_name,
-                    self.conf.data_args.dataset_config_name,
+                    dataset_name = self._dataset_name,
+                    download_config = self._dataset_config_name,
+                    subset = self._subset,
                     split="test",
-                    cache_dir=self.conf.model_args.cache_dir,
-                    use_auth_token=True
-                    if self.conf.model_args.use_auth_token
-                    else None,
+                    cache_dir=self._cache_dir,
+                    use_auth_token=self._use_auth_token
                 )
 
-            if self.conf.data_args.max_eval_samples is not None:
+            if self._max_eval_samples is not None:
                 max_eval_samples = min(
                     len(self.test),
-                    self.conf.data_args.max_eval_samples,
+                    self._max_eval_samples,
                 )
                 self.test = self.test.select(range(max_eval_samples))
 
-        elif self.conf.data_args.database_name:
+        elif self._database_name:
             logger.debug(
                 f"""Loading the data from Database:
-                {self.conf.data_args.database_name}"""
+                {self._database_name}"""
             )
 
-            if self.conf.data_args.train_table:
+            if self._train_table:
                 logger.debug(
                     f"""Loading the train data from table:
-                    {self.conf.data_args.train_table}"""
+                    {self._train_table}"""
                 )
                 train = self.spark.read.table(
-                    f"""{self.conf.data_args.database_name}
-                    .{self.conf.data_args.train_table}"""
+                    f"""{self._database_name}
+                    .{self._train_table}"""
                 )
                 train = train.toPandas()
                 self.train = Dataset.from_pandas(train)
 
-            if self.conf.data_args.validation_table:
+            if self._validation_table:
                 logger.debug(
                     f"""Loading the data validation table from:
-                    {self.conf.data_args.validation_table}"""
+                    {self._validation_table}"""
                 )
                 test = self.spark.read.table(
-                    f"""{self.conf.data_args.database_name}.
-                    {self.conf.data_args.validation_table}"""
+                    f"""{self._database_name}.
+                    {self._validation_table}"""
                 )
                 test = test.toPandas()
                 self.test = Dataset.from_pandas(test)
