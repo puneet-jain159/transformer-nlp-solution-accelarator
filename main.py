@@ -19,7 +19,7 @@ from transformers.integrations import MLflowCallback
 from datasets import load_metric, list_metrics
 
 from nlp_sa.preprocess import preprocess_function
-from nlp_sa.ModelBuilder import ModelBuilder
+from nlp_sa.model_builder import ModelBuilder
 from nlp_sa.data_loader import DataLoader
 from nlp_sa import ConfLoader
 from nlp_sa.utils.callbacks import CustomMLflowCallback
