@@ -22,12 +22,11 @@ class ModelBuilder:
         self.conf = conf
         self.Dataset = Dataset
         self.label_to_id = None
-        self._loadModelConfig()
-        self._loadTokenizer()
-        self._loadModel()
-        # self.CorrectLabeltoId()
+        self._load_model_config()
+        self._load_tokenizer()
+        self._load_model()
 
-    def _loadModelConfig(self):
+    def _load_model_config(self):
         # Load Config
         self.Dataset.get_num_class()
 
@@ -39,7 +38,7 @@ class ModelBuilder:
             revision=self.conf.model_args.model_revision,
             use_auth_token=True if self.conf.model_args.use_auth_token else None)
 
-    def _loadTokenizer(self):
+    def _load_tokenizer(self):
         '''
         Function to load tokenizer by specifying location or path in the config
         '''
@@ -67,7 +66,7 @@ class ModelBuilder:
             self.conf.max_seq_length = min(
                 self.conf.training_args.max_seq_length, self.tokenizer.model_max_length)
 
-    def _loadModel(self):
+    def _load_model(self):
         '''
         Function to load the model architecture with the specific task name
         '''
@@ -94,24 +93,24 @@ class ModelBuilder:
         else:
             raise ValueError("Model not created for the particular task")
 
-    def CorrectLabeltoId(self):
+    def correct_label_to_id(self):
         '''
         Function to correct label_to_id
         '''
         if self.conf.data_args.task_name is not None:
             if self.conf.data_args.task_name == 'multi-class':
-                self._correct_label_2_is_multiclass()
+                self._correct_multiclass_label()
             elif self.conf.data_args.task_name == 'ner':
-                self._correct_label_2_is_ner()
+                self._correct_ner_label()
 
-    def _correct_label_2_is_multiclass(self):
+    def _correct_multiclass_label(self):
         '''
         Function to correct the label2id for multiclass
         '''
+
         if (self.Dataset is not None) and (self.conf.data_args.task_name is not None):
             non_label_column_names = [
                 name for name in self.Dataset.train.column_names if name != "label"]
-            sentence1_key, sentence2_key = non_label_column_names[0], None
             self.label_to_id = {v: i for i,
                                 v in enumerate(self.Dataset.label_list)}
 
@@ -125,7 +124,7 @@ class ModelBuilder:
             self.model.config.id2label = {
                 id: label for label, id in self.config.label2id.items()}
 
-    def _correct_label_2_is_ner(self):
+    def _correct_ner_label(self):
         '''
         Function to correct the label2id for NER
         '''
