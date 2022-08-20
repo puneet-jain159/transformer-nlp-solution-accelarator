@@ -16,29 +16,34 @@ class ModelBuilder:
     Model and configuration file
     """
 
-    def __init__(self, conf, Dataset=None):
+    def __init__(
+        self,
+        conf,
+        dataset=None,
+        use_auth_token=None,
+        ignore_mismatched_sizes=True
+    ):
         self.conf = conf
-        self.Dataset = Dataset
+        self.dataset = dataset
         self.label_to_id = None
+        self.use_auth_token = use_auth_token
+        self.ignore_mismatched_sizes = ignore_mismatched_sizes
         self._load_model_config()
         self._load_tokenizer()
         self._load_model()
 
     def _load_model_config(self):
         # Load Config
-        self.Dataset.get_num_class()
-
+        # TODO: confirm if this is needed: self.dataset.get_num_class()
         self.config = AutoConfig.from_pretrained(
             self.conf.model_args.config_name
             if self.conf.model_args.config_name
             else self.conf.model_args.model_name_or_path,
-            num_labels=self.Dataset.num_labels,
+            num_labels=self.dataset.num_labels,
             finetuning_task=self.conf.data_args.task_name,
             cache_dir=self.conf.model_args.cache_dir,
             revision=self.conf.model_args.model_revision,
-            use_auth_token=True
-            if self.conf.model_args.use_auth_token
-            else None,
+            use_auth_token=self.use_auth_token
         )
 
     def _load_tokenizer(self):
@@ -53,10 +58,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 use_fast=self.conf.model_args.use_fast_tokenizer,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token=True
-                if self.conf.model_args.use_auth_token
-                else None,
-                add_prefix_space=True,
+                use_auth_token=self.use_auth_token
             )
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -66,9 +68,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 use_fast=self.conf.model_args.use_fast_tokenizer,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token=True
-                if self.conf.model_args.use_auth_token
-                else None,
+                use_auth_token=self.use_auth_token
             )
 
         # Correct the sequence length incase of any mismatch
@@ -103,8 +103,8 @@ class ModelBuilder:
                 config=self.config,
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token=self.conf.model_args.use_auth_token,
-                ignore_mismatched_sizes=self.conf.model_args.ignore_mismatched_sizes,
+                use_auth_token=self.use_auth_token,
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes
             )
         elif self.conf.data_args.task_name == "ner":
             self.model = AutoModelForTokenClassification.from_pretrained(
@@ -115,8 +115,8 @@ class ModelBuilder:
                 config=self.config,
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token = self.conf.model_args.use_auth_token,
-                ignore_mismatched_sizes=self.conf.model_args.ignore_mismatched_sizes,
+                use_auth_token=self.use_auth_token,
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes
             )
         else:
             raise ValueError(
@@ -205,14 +205,17 @@ class ModelBuilder:
                     }
             else:
                 logger.warning(
-                    "Your model seems to have been trained with labels, but they don't match the dataset: ",
-                    f"model labels: {list(sorted(self.model.config.label2id.keys()))}, dataset labels:"
-                    f" {list(sorted(self.Dataset.label_list))}.\nIgnoring the model labels as a result.",
+                    f"""Your model seems to have been trained with labels,
+                    but they don't match the dataset; model labels:
+                    {list(sorted(self.model.config.label2id.keys()))},
+                    dataset labels:
+                    {list(sorted(self.dataset.label_list))}.\n
+                    Ignoring the model labels as a result.""",
                 )
 
-        # Set the correspondences label/ID inside the model config
+        # Set the correspondences label/ID inside the model sconfig
         self.model.config.label2id = {
-            l: i for i, l in enumerate(self.Dataset.label_list)
+            l: i for i, l in enumerate(self.dataset.label_list)
         }
         self.model.config.id2label = {
             i: l for i, l in enumerate(self.Dataset.label_list)
