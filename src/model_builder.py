@@ -21,7 +21,7 @@ class ModelBuilder:
         conf,
         dataset=None,
         use_auth_token=None,
-        ignore_mismatched_sizes=True
+        ignore_mismatched_sizes=True,
     ):
         self.conf = conf
         self.dataset = dataset
@@ -43,7 +43,7 @@ class ModelBuilder:
             finetuning_task=self.conf.data_args.task_name,
             cache_dir=self.conf.model_args.cache_dir,
             revision=self.conf.model_args.model_revision,
-            use_auth_token=self.use_auth_token
+            use_auth_token=self.use_auth_token,
         )
 
     def _load_tokenizer(self):
@@ -58,7 +58,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 use_fast=self.conf.model_args.use_fast_tokenizer,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token=self.use_auth_token
+                use_auth_token=self.use_auth_token,
             )
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -68,7 +68,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 use_fast=self.conf.model_args.use_fast_tokenizer,
                 revision=self.conf.model_args.model_revision,
-                use_auth_token=self.use_auth_token
+                use_auth_token=self.use_auth_token,
             )
 
         # Correct the sequence length incase of any mismatch
@@ -94,9 +94,7 @@ class ModelBuilder:
         """
 
         if self.conf.data_args.task_name == "multi-class":
-            from_tf = bool(
-                ".ckpt" in self.conf.model_args.model_name_or_path
-            )
+            from_tf = bool(".ckpt" in self.conf.model_args.model_name_or_path)
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 self.conf.model_args.model_name_or_path,
                 from_tf=from_tf,
@@ -104,7 +102,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
                 use_auth_token=self.use_auth_token,
-                ignore_mismatched_sizes=self.ignore_mismatched_sizes
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes,
             )
         elif self.conf.data_args.task_name == "ner":
             self.model = AutoModelForTokenClassification.from_pretrained(
@@ -116,12 +114,10 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
                 use_auth_token=self.use_auth_token,
-                ignore_mismatched_sizes=self.ignore_mismatched_sizes
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes,
             )
         else:
-            raise ValueError(
-                "Model not created for the particular task"
-            )
+            raise ValueError("Model not created for the particular task")
 
     def correct_label_to_id(self):
         """
@@ -149,8 +145,7 @@ class ModelBuilder:
         if self.label_to_id is not None:
             self.model.config.label2id = self.label_to_id
             self.model.config.id2label = {
-                id: label
-                for label, id in self.config.label2id.items()
+                id: label for label, id in self.config.label2id.items()
             }
         elif (
             self.data_args.task_name is not None
@@ -160,8 +155,7 @@ class ModelBuilder:
                 l: i for i, l in enumerate(self.Dataset.label_list)
             }
             self.model.config.id2label = {
-                id: label
-                for label, id in self.config.label2id.items()
+                id: label for label, id in self.config.label2id.items()
             }
 
     def _correct_ner_label(self):
@@ -171,13 +165,11 @@ class ModelBuilder:
         # Model has labels -> use them.
         if (
             self.model.config.label2id
-            != PretrainedConfig(
-                num_labels=self.Dataset.num_labels
-            ).label2id
+            != PretrainedConfig(num_labels=self.Dataset.num_labels).label2id
         ):
-            if list(
-                sorted(self.model.config.label2id.keys())
-            ) == list(sorted(self.Dataset.label_list)):
+            if list(sorted(self.model.config.label2id.keys())) == list(
+                sorted(self.Dataset.label_list)
+            ):
                 # Reorganize `label_list` to match the ordering of the model.
                 labels_are_int = isinstance(
                     self.Dataset.train.features[
@@ -200,8 +192,7 @@ class ModelBuilder:
                         for i in range(self.Dataset.num_labels)
                     ]
                     self.label_to_id = {
-                        l: i
-                        for i, l in enumerate(self.Dataset.label_list)
+                        l: i for i, l in enumerate(self.Dataset.label_list)
                     }
             else:
                 logger.warning(

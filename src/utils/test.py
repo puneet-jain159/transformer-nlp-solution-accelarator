@@ -13,9 +13,7 @@ def over_fit_check(trainer, metric):
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
         predictions = np.argmax(predictions, axis=1)
-        return metric.compute(
-            predictions=predictions, references=labels
-        )
+        return metric.compute(predictions=predictions, references=labels)
 
     for batch in trainer.get_train_dataloader():
         break

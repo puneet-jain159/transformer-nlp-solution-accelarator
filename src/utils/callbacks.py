@@ -22,10 +22,7 @@ logger = logging.get_logger(__name__)
 
 
 def is_mlflow_available():
-    if (
-        os.getenv("DISABLE_MLFLOW_INTEGRATION", "FALSE").upper()
-        == "TRUE"
-    ):
+    if os.getenv("DISABLE_MLFLOW_INTEGRATION", "FALSE").upper() == "TRUE":
         return False
     return importlib.util.find_spec("mlflow") is not None
 
@@ -90,9 +87,7 @@ class CustomMLflowCallback(TrainerCallback):
             os.getenv("MLFLOW_NESTED_RUN", "FALSE").upper()
             in ENV_VARS_TRUE_VALUES
         )
-        self._experiment_name = os.getenv(
-            "MLFLOW_EXPERIMENT_NAME", None
-        )
+        self._experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", None)
         self._flatten_params = (
             os.getenv("MLFLOW_FLATTEN_PARAMS", "FALSE").upper()
             in ENV_VARS_TRUE_VALUES
@@ -119,9 +114,7 @@ class CustomMLflowCallback(TrainerCallback):
             ):
                 if self._experiment_name:
                     # Use of set_experiment() ensure that Experiment is created if not exists
-                    self._ml_flow.set_experiment(
-                        self._experiment_name
-                    )
+                    self._ml_flow.set_experiment(self._experiment_name)
                 self._ml_flow.start_run(
                     run_name=args.run_name, nested=self._nested_run
                 )
@@ -176,15 +169,11 @@ class CustomMLflowCallback(TrainerCallback):
                 self._ml_flow.set_tags(mlflow_tags)
         self._initialized = True
 
-    def on_train_begin(
-        self, args, state, control, model=None, **kwargs
-    ):
+    def on_train_begin(self, args, state, control, model=None, **kwargs):
         if not self._initialized:
             self.setup(args, state, model)
 
-    def on_log(
-        self, args, state, control, logs, model=None, **kwargs
-    ):
+    def on_log(self, args, state, control, logs, model=None, **kwargs):
         if not self._initialized:
             logger.warning("logger started run")
             self.setup(args, state, model)
@@ -198,9 +187,7 @@ class CustomMLflowCallback(TrainerCallback):
                         f'Trainer is attempting to log a value of "{v}" of type {type(v)} for key "{k}" as a metric. '
                         "MLflow's log_metric() only accepts float and int types so we dropped this attribute."
                     )
-            self._ml_flow.log_metrics(
-                metrics=metrics, step=state.global_step
-            )
+            self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
 
     def on_epoch_begin(
         self,
@@ -216,8 +203,7 @@ class CustomMLflowCallback(TrainerCallback):
         if (
             self._auto_end_run
             and self._ml_flow.active_run()
-            and self._parent_run_id
-            != self._ml_flow.active_run().info.run_id
+            and self._parent_run_id != self._ml_flow.active_run().info.run_id
         ):
             logger.warning("terminate run")
             self._ml_flow.end_run()
@@ -293,20 +279,14 @@ class CustomMLflowCallback(TrainerCallback):
             )
 
             # Create conda environment
-            with open(
-                "requirements.txt", "r"
-            ) as additional_requirements:
+            with open("requirements.txt", "r") as additional_requirements:
                 libraries = additional_requirements.readlines()
-                libraries = [
-                    library.rstrip() for library in libraries
-                ]
+                libraries = [library.rstrip() for library in libraries]
 
             model_env = self._ml_flow.pyfunc.get_default_conda_env()
             model_env["dependencies"][-1]["pip"] += libraries
 
-            input_example = train_dataloader.dataset.data[
-                :5
-            ].to_pandas()
+            input_example = train_dataloader.dataset.data[:5].to_pandas()
 
             # get the code
             path = [f"{os.getcwd()}/nlp_sa", f"{os.getcwd()}/conf"]
@@ -335,10 +315,7 @@ class CustomMLflowCallback(TrainerCallback):
         if (
             self._auto_end_run
             and self._ml_flow.active_run()
-            and (
-                self._parent_run_id
-                != self._ml_flow.active_run().info.run_id
-            )
+            and (self._parent_run_id != self._ml_flow.active_run().info.run_id)
         ):
             logger.debug("terminating child run")
             self._ml_flow.end_run()
@@ -364,22 +341,14 @@ class CustomMLflowCallback(TrainerCallback):
                 )
 
                 # Create conda environment
-                with open(
-                    "requirements.txt", "r"
-                ) as additional_requirements:
+                with open("requirements.txt", "r") as additional_requirements:
                     libraries = additional_requirements.readlines()
-                    libraries = [
-                        library.rstrip() for library in libraries
-                    ]
+                    libraries = [library.rstrip() for library in libraries]
 
-                model_env = (
-                    self._ml_flow.pyfunc.get_default_conda_env()
-                )
+                model_env = self._ml_flow.pyfunc.get_default_conda_env()
                 model_env["dependencies"][-1]["pip"] += libraries
 
-                input_example = train_dataloader.dataset.data[
-                    :5
-                ].to_pandas()
+                input_example = train_dataloader.dataset.data[:5].to_pandas()
 
                 # get the code
                 path = [
@@ -405,10 +374,7 @@ class CustomMLflowCallback(TrainerCallback):
         if (
             self._auto_end_run
             and self._ml_flow.active_run()
-            and (
-                self._parent_run_id
-                == self._ml_flow.active_run().info.run_id
-            )
+            and (self._parent_run_id == self._ml_flow.active_run().info.run_id)
         ):
             logger.debug("terminating parent run")
             self._ml_flow.end_run()

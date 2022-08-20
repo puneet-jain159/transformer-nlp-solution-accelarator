@@ -9,10 +9,9 @@ from .utils.arguments import DataTrainingArguments, ModelArguments
 
 from typing import Union, Dict, Any
 
+
 class ConfLoader:
-    def __init__(
-        self, conf: Union[str, Dict[str, Any]] = "conf/model.yaml"
-    ):
+    def __init__(self, conf: Union[str, Dict[str, Any]] = "conf/model.yaml"):
         self.conf = self._load_conf_file(conf)
         (
             self.model_args,
@@ -30,9 +29,7 @@ class ConfLoader:
             logger.debug(
                 f"Reading the configuration from YAML file in location :{conf}"
             )
-            _yaml_conf = yaml.safe_load(
-                pathlib.Path(f"./{conf}").read_text()
-            )
+            _yaml_conf = yaml.safe_load(pathlib.Path(f"./{conf}").read_text())
             conf = OmegaConf.create(_yaml_conf)
         return conf
 
