@@ -1,4 +1,4 @@
-from datasets import load_dataset, load_metric, Dataset, ClassLabel
+from datasets import load_dataset, Dataset, ClassLabel
 from transformers.utils import logging
 from .utils import get_label_list
 
@@ -15,16 +15,17 @@ class DataLoader:
         self.spark = spark
         self.num_labels = None
         self.label_list = None
-        self._LoadDataSet()
+        self._load_dataset()
 
-    def _LoadDataSet(self):
+    def _load_dataset(self):
         """
         Function to load data from Delta table or HuggingFace DataSet
         """
 
         if self.conf.data_args.dataset_name:
             logger.debug(
-                f"Loading the dataset from hugging face dataset: {self.conf.data_args.dataset_name}"
+                f"""Loading the dataset from hugging face dataset:
+                {self.conf.data_args.dataset_name}"""
             )
             if self.conf.training_args.do_train:
                 self.train = load_dataset(
@@ -66,25 +67,30 @@ class DataLoader:
 
         elif self.conf.data_args.database_name:
             logger.debug(
-                f"Loading the data from Database: {self.conf.data_args.database_name}"
+                f"""Loading the data from Database:
+                {self.conf.data_args.database_name}"""
             )
 
             if self.conf.data_args.train_table:
                 logger.debug(
-                    f"Loading the train data from table: {self.conf.data_args.train_table}"
+                    f"""Loading the train data from table:
+                    {self.conf.data_args.train_table}"""
                 )
                 train = self.spark.read.table(
-                    f"{self.conf.data_args.database_name}.{self.conf.data_args.train_table}"
+                    f"""{self.conf.data_args.database_name}
+                    .{self.conf.data_args.train_table}"""
                 )
                 train = train.toPandas()
                 self.train = Dataset.from_pandas(train)
 
             if self.conf.data_args.validation_table:
                 logger.debug(
-                    f"Loading the data validation table from: {self.conf.data_args.validation_table}"
+                    f"""Loading the data validation table from:
+                    {self.conf.data_args.validation_table}"""
                 )
                 test = self.spark.read.table(
-                    f"{self.conf.data_args.database_name}.{self.conf.data_args.validation_table}"
+                    f"""{self.conf.data_args.database_name}.
+                    {self.conf.data_args.validation_table}"""
                 )
                 test = test.toPandas()
                 self.test = Dataset.from_pandas(test)
@@ -125,15 +131,19 @@ class DataLoader:
         self.label_list = self.train.unique(
             self.conf.data_args.label_col
         )
-        self.label_list.sort()  # Let's sort it for determinism
+        # Let's sort it for determinism
+        self.label_list.sort()
         return len(self.label_list)
 
     def _get_num_class_ner(self):
         """
         Function to get num of classes when task name is ner
         """
-        # If the labels are of type ClassLabel, they are already integers and we have the map stored somewhere.
-        # Otherwise, we have to get the list of labels manually.
+
+        """If the labels are of type ClassLabel, they are already integers
+        and we have the map stored somewhere. Otherwise, we have to get
+        the list of labels manually."""
+
         labels_are_int = isinstance(
             self.train.features[
                 self.conf.data_args.label_col
