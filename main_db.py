@@ -4,20 +4,16 @@
 
 # COMMAND ----------
 
-import numpy as np
-import datasets
-import sys
-import random
+
 import os
-import logging
+import pandas as pd
+import yaml
 
 from functools import partial
 from transformers import (
     DataCollatorWithPadding,
-    EvalPrediction,
     Trainer,
     default_data_collator,
-  DataCollatorForTokenClassification,
     set_seed)
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import MLflowCallback
@@ -27,9 +23,16 @@ from nlp_sa.preprocess import preprocess_function
 from nlp_sa.ModelBuilder import ModelBuilder
 from nlp_sa.data_loader import DataLoader
 from nlp_sa import ConfLoader
+from nlp_sa.utils import add_args_from_dataclass
 from nlp_sa.utils.callbacks import CustomMLflowCallback
 from nlp_sa.evaluate import compute_metrics
 
+# yaml
+yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
+    yaml.representer.SafeRepresenter.represent_str(
+        self,
+        str(data),
+    )
 # COMMAND ----------
 
 log4jLogger = sc._jvm.org.apache.log4j
@@ -86,7 +89,7 @@ with conf.training_args.main_process_first(desc="dataset map test pre-processing
 
 # Get the metric function
 if conf.training_args.metric_for_best_model is not None:
-    metric = load_metric("seqeval")
+    metric = load_metric(conf.model_args.evaluate_metric)
 
 
 # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
@@ -101,10 +104,21 @@ else:
 
 compute_m = partial(compute_metrics,conf = conf,metric = metric,Dataset = DataSet)
 
-# 
-conf.training_args.max_token_length = conf.data_args.max_seq_length
-conf.training_args.save_as_cpu_model = True
-conf.training_args.task_name = conf.data_args.task_name
+#combine the arguements for trainig 
+conf.training_args.input_example = pd.DataFrame(DataSet.train[:5])[conf.data_args.feature_col].to_frame()
+add_args_from_dataclass(conf.training_args,conf.model_args) 
+add_args_from_dataclass(conf.training_args,conf.data_args) 
+
+# log the conf as conf.yaml
+
+filename = os.path.join(conf.training_args.output_dir,'code/conf.yaml')
+os.makedirs(os.path.dirname(filename), exist_ok=True)
+conf.training_args.loc = filename
+print("filename:",filename)
+f = open(filename, 'w+')
+yaml.safe_dump(conf.training_args.__dict__, f, allow_unicode=True,encoding='utf-8')
+ 
+
 
 # data_collator = DataCollatorForTokenClassification(Model.tokenizer, pad_to_multiple_of=8 if conf.training_args.fp16 else None)
 # Initialize our Trainer

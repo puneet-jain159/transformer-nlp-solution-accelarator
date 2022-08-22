@@ -4,6 +4,7 @@ import pathlib
 from typing import Dict, Any, Tuple, List, Union
 import pandas as pd
 from omegaconf import OmegaConf
+from dataclasses import dataclass, field
 import logging
 
 from transformers import (
@@ -23,8 +24,10 @@ class ConfLoader:
     def __init__(
             self,
             conf: Union[str, Dict[str, Any]] = "conf/model.yaml"):
+        self.loc = None
         self.conf = self._load_conf_file(conf)
         self.model_args, self.data_args, self.training_args = self.load_HfFArgurements()
+
 
     def _load_conf_file(self, conf):
         '''
@@ -33,6 +36,7 @@ class ConfLoader:
         if isinstance(conf, dict):
             conf = OmegaConf.create(conf)
         elif isinstance(conf, str):
+            self.loc = conf
             logger.debug(f"Reading the configuration from YAML file in location :{conf}")
             _yaml_conf = yaml.safe_load(
                 pathlib.Path(f"./{conf}").read_text()

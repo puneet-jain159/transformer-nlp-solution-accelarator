@@ -114,6 +114,6 @@ dbx sync repo -d transformer-nlp-solution-accelarator_dbx --profile e2-field --u
 ```
 
 You can sync your local repository with databricks repos using dbx sync command
-'''
+```
 dbx sync repo -d transformer-nlp-solution-accelarator_dbx --profile e2-field --use-gitignore -ep mlruns/  --no-watch
-'''
+```

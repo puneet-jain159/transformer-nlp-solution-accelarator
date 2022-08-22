@@ -7,6 +7,7 @@ import os
 from glob import glob
 import sys
 import tempfile
+import shutil
 from pathlib import Path
 from .custom_func import TransformerModel
 
@@ -14,6 +15,10 @@ from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES, is_t
 
 
 logger = logging.get_logger(__name__)
+
+
+# These are the libraries to ignore
+PIP_LIBRARIES = ['transformers','torch']
 
 
 def is_mlflow_available():
@@ -151,7 +156,96 @@ class CustomMLflowCallback(TrainerCallback):
             self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
 
     def on_epoch_begin(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
+        logger.warning(f"start epoch {args.save_strategy}")
 
+        if args.save_strategy == 'epoch':
+            logger.warning("terminate run")
+            self.__initalize_nested_run(state, args, model)
+
+    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
+
+        if self._create_model:
+            logger.debug("Creating Custom Pyfunc Model")
+
+            if args.save_strategy == 'epoch':
+                self._log_ml_flow_model(
+                    args, state, control, model, tokenizer, train_dataloader)
+
+    def on_train_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
+
+        if (self._auto_end_run and self._ml_flow.active_run()
+                and (self._parent_run_id != self._ml_flow.active_run().info.run_id)):
+            logger.debug("terminating child run")
+            self._ml_flow.end_run()
+
+        if self._initialized and state.is_world_process_zero:
+            # if self._log_artifacts:
+            #     logger.info("Logging artifacts. This may take time.")
+            #     self._ml_flow.log_artifacts(args.output_dir)
+            #     logger.info("Logging Tokenizer")
+            #     tokenizer.save_pretrained(args.output_dir)
+
+            if self._create_model:
+                logger.info("Creating Custom Pyfunc Model")
+                self._log_ml_flow_model(
+                    args, state, control, model, tokenizer, train_dataloader)
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        """
+        Event called after an evaluation phase.
+        """
+        logger.debug("Evaluate has been called")
+        if (self._auto_end_run and self._ml_flow.active_run()
+                and (self._parent_run_id == self._ml_flow.active_run().info.run_id)):
+            logger.debug("terminating parent run")
+            self._ml_flow.end_run()
+
+    def __del__(self):
+        # if the previous run is not terminated correctly, the fluent API will
+        # not let you start a new run before the previous one is killed
+        if (
+            self._auto_end_run
+            and callable(getattr(self._ml_flow, "active_run", None))
+            and self._ml_flow.active_run() is not None
+        ):
+            self._ml_flow.end_run()
+
+    def _log_ml_flow_model(self, args, state, control,
+                           model=None, tokenizer=None, train_dataloader=None,):
+        '''
+        Function to log model to mlflow
+        '''
+        if args.save_as_cpu_model:
+            model = model.to("cpu")
+        # Create conda environment
+        model_env = self._ml_flow.pyfunc.get_default_conda_env()
+        model_env['dependencies'][-1]['pip'] += PIP_LIBRARIES
+
+        # get the code
+        
+        # path = [f'{os.getcwd()}/nlp_sa/utils/custom_func.py']
+        path = [f'{os.getcwd()}/nlp_sa/utils/custom_func.py',args.loc]
+        
+        print("path: ",path)
+        model.save_pretrained(os.path.join(args.output_dir,'current_run/model'))
+        tokenizer.save_pretrained(os.path.join(args.output_dir, 'current_run/model'))
+        
+
+        self._ml_flow.pyfunc.log_model("hugging_face",
+                                        conda_env=model_env,
+                                        code_path=path,
+                                        loader_module= f'custom_func',
+                                        data_path=os.path.join(os.path.abspath(args.output_dir),'current_run/model'),
+                                        input_example=args.input_example)
+
+        model = model.to("cuda" if args.n_gpu > 0 else "cpu")
+
+        shutil.rmtree(os.path.join(args.output_dir,'current_run'))
+
+    def __initalize_nested_run(self, state, args, model):
+        '''
+        Function to initialize nested run
+        '''
         if (self._auto_end_run and self._ml_flow.active_run()
                 and self._parent_run_id != self._ml_flow.active_run().info.run_id):
             logger.warning("terminate run")
@@ -189,102 +283,3 @@ class CustomMLflowCallback(TrainerCallback):
             if mlflow_tags:
                 mlflow_tags = json.loads(mlflow_tags)
                 self._ml_flow.set_tags(mlflow_tags)
-
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
-
-        if self._create_model:
-            logger.debug("Creating Custom Pyfunc Model")
-            
-            if args.save_as_cpu_model:
-                model = model.to("cpu")
-            transformer_model = TransformerModel(tokenizer=tokenizer,
-                                                 model=model,
-                                                 max_token_length=args.max_token_length,
-                                                 task_name = args.task_name)
-
-            # Create conda environment
-            with open('requirements.txt', 'r') as additional_requirements:
-                libraries = additional_requirements.readlines()
-                libraries = [library.rstrip() for library in libraries]
-
-            model_env = self._ml_flow.pyfunc.get_default_conda_env()
-            model_env['dependencies'][-1]['pip'] += libraries
-
-            input_example = train_dataloader.dataset.data[:5].to_pandas()
-
-            # get the code
-            path = [f'{os.getcwd()}/nlp_sa',f'{os.getcwd()}/conf']
-
-            self._ml_flow.pyfunc.log_model("mlflow_model",
-                                           python_model=transformer_model,
-                                           conda_env=model_env,
-                                           code_path = path,
-                                           input_example=input_example)
-            
-            model = model.to("cuda" if args.n_gpu > 0 else "cpu")
-
-    def on_train_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
-
-        if (self._auto_end_run and self._ml_flow.active_run()
-                and (self._parent_run_id != self._ml_flow.active_run().info.run_id)):
-            logger.debug("terminating child run")
-            self._ml_flow.end_run()
-
-        if self._initialized and state.is_world_process_zero:
-            if self._log_artifacts:
-                logger.info("Logging artifacts. This may take time.")
-                self._ml_flow.log_artifacts(args.output_dir)
-                logger.info("Logging Tokenizer")
-                tokenizer.save_pretrained(args.output_dir)
-
-            if self._create_model:
-                logger.info("Creating Custom Pyfunc Model")
-                
-                if args.save_as_cpu_model:
-                    model = model.to("cpu")
-
-                transformer_model = TransformerModel(tokenizer=tokenizer,
-                                                     model=model,
-                                                     max_token_length=args.max_token_length,
-                                                     task_name = args.task_name)
-
-                # Create conda environment
-                with open('requirements.txt', 'r') as additional_requirements:
-                    libraries = additional_requirements.readlines()
-                    libraries = [library.rstrip() for library in libraries]
-
-                model_env = self._ml_flow.pyfunc.get_default_conda_env()
-                model_env['dependencies'][-1]['pip'] += libraries
-
-                input_example = train_dataloader.dataset.data[:5].to_pandas()
-
-                # get the code
-                path = [f'{os.getcwd()}/nlp_sa',f'{os.getcwd()}/conf']
-
-                self._ml_flow.pyfunc.log_model("mlflow_model",
-                                            python_model=transformer_model,
-                                            conda_env=model_env,
-                                            code_path = path,
-                                            input_example=input_example)
-                
-                model = model.to("cuda" if args.n_gpu > 0 else "cpu")
-
-    def on_evaluate(self, args, state, control, **kwargs):
-        """
-        Event called after an evaluation phase.
-        """
-        logger.debug("Evaluate has been called")
-        if (self._auto_end_run and self._ml_flow.active_run()
-                and (self._parent_run_id == self._ml_flow.active_run().info.run_id)):
-            logger.debug("terminating parent run")
-            self._ml_flow.end_run()
-
-    def __del__(self):
-        # if the previous run is not terminated correctly, the fluent API will
-        # not let you start a new run before the previous one is killed
-        if (
-            self._auto_end_run
-            and callable(getattr(self._ml_flow, "active_run", None))
-            and self._ml_flow.active_run() is not None
-        ):
-            self._ml_flow.end_run()
