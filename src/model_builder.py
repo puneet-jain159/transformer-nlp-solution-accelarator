@@ -18,16 +18,33 @@ class ModelBuilder:
 
     def __init__(
         self,
-        conf,
         dataset=None,
         use_auth_token=None,
         ignore_mismatched_sizes=True,
+        task_name="text-classification",
+        cache_dir="/tmp/hf_cache/",
+        model_revision=None,
+        model_name_or_path=None,
+        tokenizer_name_or_path=None,
+        config_name=None,
+        use_fast_tokenizer=False,
+        max_seq_length=1024
     ):
-        self.conf = conf
-        self.dataset = dataset
-        self.label_to_id = None
-        self.use_auth_token = use_auth_token
-        self.ignore_mismatched_sizes = ignore_mismatched_sizes
+        self._dataset = dataset
+        self._label_to_id = None
+        self._use_auth_token = use_auth_token
+        self._ignore_mismatched_sizes = ignore_mismatched_sizes
+        self._model_name_or_path = model_name_or_path
+        self._config_name = config_name
+        self._task_name = task_name
+        self._cache_dir = cache_dir
+        self._model_revision = model_revision
+        self._use_fast_tokenizer = use_fast_tokenizer
+        self._max_seq_length = max_seq_length
+        self._tokenizer_name_or_path = tokenizer_name_or_path \
+            if tokenizer_name_or_path \
+            else model_name_or_path
+
         self._load_model_config()
         self._load_tokenizer()
         self._load_model()
@@ -36,14 +53,12 @@ class ModelBuilder:
         # Load Config
         # TODO: confirm if this is needed: self.dataset.get_num_class()
         self.config = AutoConfig.from_pretrained(
-            self.conf.model_args.config_name
-            if self.conf.model_args.config_name
-            else self.conf.model_args.model_name_or_path,
-            num_labels=self.dataset.num_labels,
-            finetuning_task=self.conf.data_args.task_name,
-            cache_dir=self.conf.model_args.cache_dir,
-            revision=self.conf.model_args.model_revision,
-            use_auth_token=self.use_auth_token,
+            self._config_name,
+            num_labels=self._dataset.num_labels,
+            finetuning_task=self._task_name,
+            cache_dir=self._cache_dir,
+            revision=self._model_revision,
+            use_auth_token=self._use_auth_token,
         )
 
     def _load_tokenizer(self):
@@ -52,40 +67,36 @@ class ModelBuilder:
         """
         if self.config.model_type in {"gpt2", "roberta"}:
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.conf.model_args.tokenizer_name
-                if self.conf.model_args.tokenizer_name
-                else self.conf.model_args.model_name_or_path,
-                cache_dir=self.conf.model_args.cache_dir,
-                use_fast=self.conf.model_args.use_fast_tokenizer,
-                revision=self.conf.model_args.model_revision,
-                use_auth_token=self.use_auth_token,
+                self._tokenizer_name,
+                cache_dir=self._cache_dir,
+                use_fast=self._use_fast_tokenizer,
+                revision=self._model_revision,
+                use_auth_token=self._use_auth_token,
             )
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.conf.model_args.tokenizer_name
-                if self.conf.model_args.tokenizer_name
-                else self.conf.model_args.model_name_or_path,
-                cache_dir=self.conf.model_args.cache_dir,
-                use_fast=self.conf.model_args.use_fast_tokenizer,
-                revision=self.conf.model_args.model_revision,
-                use_auth_token=self.use_auth_token,
+                self._tokenizer_name,
+                cache_dir=self._cache_dir,
+                use_fast=self._use_fast_tokenizer,
+                revision=self._model_revision,
+                use_auth_token=self._use_auth_token,
             )
 
         # Correct the sequence length incase of any mismatch
         if (
-            self.conf.data_args.max_seq_length
-            > self.tokenizer.model_max_length
+            self._max_seq_length
+            > self._tokenizer.model_max_length
         ):
             logger.warning(
                 f"""The max_seq_length passed
-                    ({self.conf.data_args.max_seq_length})
+                    ({self._max_seq_length})
                     is larger than the maximum length for the model
-                    ({self.tokenizer.model_max_length}).
-                    Using max_seq_length={self.tokenizer.model_max_length}."""
+                    ({self._tokenizer.model_max_length}).
+                    Using max_seq_length={self._tokenizer.model_max_length}."""
             )
-            self.conf.max_seq_length = min(
-                self.conf.training_args.max_seq_length,
-                self.tokenizer.model_max_length,
+            self._max_seq_length = min(
+                self._max_seq_length,
+                self._tokenizer.model_max_length,
             )
 
     def _load_model(self):
@@ -93,8 +104,8 @@ class ModelBuilder:
         Function to load the model architecture with the specific task name
         """
 
-        if self.conf.data_args.task_name == "multi-class":
-            from_tf = bool(".ckpt" in self.conf.model_args.model_name_or_path)
+        if self._task_name == "multi-class":
+            from_tf = bool(".ckpt" in self._model_name_or_path)
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 self.conf.model_args.model_name_or_path,
                 from_tf=from_tf,
