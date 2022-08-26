@@ -19,7 +19,7 @@ class ModelBuilder:
     def __init__(
         self,
         dataset,
-        label_col = "answers",
+        label_col="answers",
         use_auth_token=None,
         ignore_mismatched_sizes=True,
         task_name="sequence-classification",
@@ -37,17 +37,19 @@ class ModelBuilder:
         self._use_auth_token = use_auth_token
         self._ignore_mismatched_sizes = ignore_mismatched_sizes
         self._model_name_or_path = model_name_or_path
-        self._config_name_or_path = config_name_or_path \
-            if config_name_or_path \
-            else model_name_or_path
+        self._config_name_or_path = (
+            config_name_or_path if config_name_or_path else model_name_or_path
+        )
         self._task_name = task_name
         self._cache_dir = cache_dir
         self._model_revision = model_revision
         self._use_fast_tokenizer = use_fast_tokenizer
         self._max_seq_length = max_seq_length
-        self._tokenizer_name_or_path = tokenizer_name_or_path \
-            if tokenizer_name_or_path \
+        self._tokenizer_name_or_path = (
+            tokenizer_name_or_path
+            if tokenizer_name_or_path
             else model_name_or_path
+        )
 
         self._load_model_config()
         self._load_tokenizer()
@@ -67,8 +69,8 @@ class ModelBuilder:
         """
         Function to load tokenizer by specifying location or path in the config
         """
-        if self._config.model_type in {"gpt2", "roberta"}:
-            self._tokenizer = AutoTokenizer.from_pretrained(
+        if self._config.model_type in ["gpt2", "roberta"]:
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 self._tokenizer_name_or_path,
                 cache_dir=self._cache_dir,
                 use_fast=self._use_fast_tokenizer,
@@ -76,7 +78,7 @@ class ModelBuilder:
                 use_auth_token=self._use_auth_token,
             )
         else:
-            self._tokenizer = AutoTokenizer.from_pretrained(
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 self._tokenizer_name_or_path,
                 cache_dir=self._cache_dir,
                 use_fast=self._use_fast_tokenizer,
@@ -85,20 +87,17 @@ class ModelBuilder:
             )
 
         # Correct the sequence length incase of any mismatch
-        if (
-            self._max_seq_length
-            > self._tokenizer.model_max_length
-        ):
+        if self._max_seq_length > self.tokenizer.model_max_length:
             logger.warning(
                 f"""The max_seq_length passed
                     ({self._max_seq_length})
                     is larger than the maximum length for the model
-                    ({self._tokenizer.model_max_length}).
-                    Using max_seq_length={self._tokenizer.model_max_length}."""
+                    ({self.tokenizer.model_max_length}).
+                    Using max_seq_length={self.tokenizer.model_max_length}."""
             )
             self._max_seq_length = min(
                 self._max_seq_length,
-                self._tokenizer.model_max_length,
+                self.tokenizer.model_max_length,
             )
 
     def _load_model(self):
@@ -111,7 +110,7 @@ class ModelBuilder:
         task_mapping = {
             "multi-class": AutoModelForSequenceClassification,
             "ner": AutoModelForTokenClassification,
-            "sentiment": AutoModelForSequenceClassification
+            "sentiment": AutoModelForSequenceClassification,
         }
 
         if self._task_name in task_mapping.keys():
@@ -119,7 +118,7 @@ class ModelBuilder:
         else:
             raise ValueError(f"{self._task_name} tasks are not available")
 
-        self._model = AutoClass.from_pretrained(
+        self.model = AutoClass.from_pretrained(
             self._model_name_or_path,
             from_tf=from_tf,
             config=self._config,
@@ -144,9 +143,7 @@ class ModelBuilder:
         Function to correct the label2id for multiclass
         """
 
-        if (self._dataset is not None) and (
-            self._task_name is not None
-        ):
+        if (self._dataset is not None) and (self._task_name is not None):
 
             self.label_to_id = {
                 v: i for i, v in enumerate(self._dataset.label_list)
@@ -157,14 +154,11 @@ class ModelBuilder:
             self._id2label = {
                 id: label for label, id in self._config.label2id.items()
             }
-        elif (
-            self._task_name is not None
-            and not self._is_regression
-        ):
-            self._model._config.label2id = {
+        elif self._task_name is not None and not self._is_regression:
+            self.model._config.label2id = {
                 l: i for i, l in enumerate(self._dataset.label_list)
             }
-            self._model._config.id2label = {
+            self.model._config.id2label = {
                 id: label for label, id in self._config.label2id.items()
             }
 
@@ -174,31 +168,29 @@ class ModelBuilder:
         """
         # Model has labels -> use them.
         if (
-            self._model.config.label2id
+            self.model.config.label2id
             != PretrainedConfig(num_labels=self._dataset.num_labels).label2id
         ):
-            if list(sorted(self._model.config.label2id.keys())) == list(
+            if list(sorted(self.model.config.label2id.keys())) == list(
                 sorted(self._dataset.label_list)
             ):
                 # Reorganize `label_list` to match the ordering of the model.
                 labels_are_int = isinstance(
-                    self._dataset.train.features[
-                        self._label_col
-                    ].feature,
+                    self._dataset.train.features[self._label_col].feature,
                     int,
                 )
                 if labels_are_int:
                     self._dataset.label_to_id = {
-                        i: int(self._model.config.label2id[l])
+                        i: int(self.model.config.label2id[l])
                         for i, l in enumerate(self._dataset.label_list)
                     }
                     self._label_list = [
-                        self._model.config.id2label[i]
+                        self.model.config.id2label[i]
                         for i in range(self._dataset.num_labels)
                     ]
                 else:
                     self._dataset.label_list = [
-                        self._model.config.id2label[i]
+                        self.model.config.id2label[i]
                         for i in range(self._dataset.num_labels)
                     ]
                     self._label_to_id = {
@@ -208,16 +200,16 @@ class ModelBuilder:
                 logger.warning(
                     f"""Your model seems to have been trained with labels,
                     but they don't match the dataset; model labels:
-                    {list(sorted(self._model.config.label2id.keys()))},
+                    {list(sorted(self.model.config.label2id.keys()))},
                     dataset labels:
                     {list(sorted(self._dataset.label_list))}.\n
                     Ignoring the model labels as a result.""",
                 )
 
         # Set the correspondences label/ID inside the model sconfig
-        self._model.config.label2id = {
+        self.model.config.label2id = {
             l: i for i, l in enumerate(self._dataset.label_list)
         }
-        self._model.config.id2label = {
+        self.model.config.id2label = {
             i: l for i, l in enumerate(self._dataset.label_list)
         }
