@@ -19,15 +19,15 @@ class ModelBuilder:
     def __init__(
         self,
         dataset,
-        label_col,
+        label_col = "answers",
         use_auth_token=None,
         ignore_mismatched_sizes=True,
-        task_name="text-classification",
+        task_name="sequence-classification",
         cache_dir="/tmp/hf_cache/",
         model_revision=None,
         model_name_or_path=None,
         tokenizer_name_or_path=None,
-        config_name=None,
+        config_name_or_path=None,
         use_fast_tokenizer=False,
         max_seq_length=1024,
     ):
@@ -37,7 +37,9 @@ class ModelBuilder:
         self._use_auth_token = use_auth_token
         self._ignore_mismatched_sizes = ignore_mismatched_sizes
         self._model_name_or_path = model_name_or_path
-        self._config_name = config_name
+        self._config_name_or_path = config_name_or_path \
+            if config_name_or_path \
+            else model_name_or_path
         self._task_name = task_name
         self._cache_dir = cache_dir
         self._model_revision = model_revision
@@ -54,8 +56,7 @@ class ModelBuilder:
     def _load_model_config(self):
         # Load Config
         self._config = AutoConfig.from_pretrained(
-            self._config_name,
-            num_labels=self._dataset.num_labels,
+            self._config_name_or_path,
             finetuning_task=self._task_name,
             cache_dir=self._cache_dir,
             revision=self._model_revision,
@@ -104,32 +105,29 @@ class ModelBuilder:
         """
         Function to load the model architecture with the specific task name
         """
+        from_tf = bool(".ckpt" in self._model_name_or_path)
 
-        if self._task_name == "multi-class":
-            from_tf = bool(".ckpt" in self._model_name_or_path)
-            self._model = AutoModelForSequenceClassification.from_pretrained(
-                self._model_name_or_path,
-                from_tf=from_tf,
-                config=self._config,
-                cache_dir=self._cache_dir,
-                revision=self._model_revision,
-                use_auth_token=self._use_auth_token,
-                ignore_mismatched_sizes=self._ignore_mismatched_sizes,
-            )
-        elif self._task_name == "ner":
-            self._model = AutoModelForTokenClassification.from_pretrained(
-                self._model_name_or_path,
-                from_tf=bool(
-                    ".ckpt" in self._model_name_or_path
-                ),
-                config=self._config,
-                cache_dir=self._cache_dir,
-                revision=self._model_revision,
-                use_auth_token=self._use_auth_token,
-                ignore_mismatched_sizes=self._ignore_mismatched_sizes,
-            )
+        AutoClass = None
+        task_mapping = {
+            "multi-class": AutoModelForSequenceClassification,
+            "ner": AutoModelForTokenClassification,
+            "sentiment": AutoModelForSequenceClassification
+        }
+
+        if self._task_name in task_mapping.keys():
+            AutoClass = task_mapping[self._task_name]
         else:
-            raise ValueError("Model not created for the particular task")
+            raise ValueError(f"{self._task_name} tasks are not available")
+
+        self._model = AutoClass.from_pretrained(
+            self._model_name_or_path,
+            from_tf=from_tf,
+            config=self._config,
+            cache_dir=self._cache_dir,
+            revision=self._model_revision,
+            use_auth_token=self._use_auth_token,
+            ignore_mismatched_sizes=self._ignore_mismatched_sizes,
+        )
 
     def correct_label_to_id(self):
         """
