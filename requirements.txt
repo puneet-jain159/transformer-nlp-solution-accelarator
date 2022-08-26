@@ -1,5 +1,6 @@
+#todo: Pinning the versions
 torch
-transformers
+transformers==4.21.1
 datasets
 pyarrow
 numpy
@@ -12,3 +13,4 @@ pyyaml
 pytest
 pytest-cov
 dbx
+python-dotenv
