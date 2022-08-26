@@ -33,3 +33,16 @@ def get_label_list(labels):
     label_list = list(unique_labels)
     label_list.sort()
     return label_list
+
+
+def add_args_from_dataclass(class1,class2):
+    '''
+    Function to merge attributes between 2 dataclasses
+    '''
+    for key,value in class2.__dict__.items():
+        if key in class1.__dict__:
+            raise ValueError(f'Dulplicate found in the new dataclass : {key} ')
+        else:
+            setattr(class1,key, value)
+    
+    return class1

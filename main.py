@@ -1,16 +1,13 @@
 %autoindent
 
-import numpy as np
-import datasets
-import sys
-import random
+import pandas as pd
 import os
 import logging
+import yaml
 
 from functools import partial
 from transformers import (
     DataCollatorWithPadding,
-    EvalPrediction,
     Trainer,
     default_data_collator,
     set_seed)
@@ -22,9 +19,17 @@ from nlp_sa.preprocess import preprocess_function
 from nlp_sa.ModelBuilder import ModelBuilder
 from nlp_sa.data_loader import DataLoader
 from nlp_sa import ConfLoader
+from nlp_sa.utils import add_args_from_dataclass
 from nlp_sa.utils.callbacks import CustomMLflowCallback
 from nlp_sa.evaluate import compute_metrics
 
+import mlflow
+
+yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
+    yaml.representer.SafeRepresenter.represent_str(
+        self,
+        str(data),
+    )
 
 
 logger = logging.getLogger("runner.log")
@@ -35,7 +40,7 @@ logging.basicConfig(
     filename="runner.log",
     filemode='a')
 
-conf = ConfLoader()
+conf = ConfLoader('conf/model_multi_class.yaml')
 
 log_level = conf.training_args.log_level
 logger.setLevel(log_level)
@@ -82,7 +87,7 @@ with conf.training_args.main_process_first(desc="dataset map test pre-processing
 
 # Get the metric function
 if conf.training_args.metric_for_best_model is not None:
-    metric = load_metric(conf.training_args.metric_for_best_model)
+    metric = load_metric(conf.model_args.evaluate_metric)
 
 
 # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
@@ -96,7 +101,7 @@ else:
     data_collator = None
 
 
-compute_m = partial(compute_metrics, conf=conf, metric=metric)
+compute_m = partial(compute_metrics, conf=conf, metric=metric,Dataset=DataSet)
 
 # Initialize our Trainer
 trainer = Trainer(
@@ -119,7 +124,21 @@ os.environ["TOKENIZERS_PARALLELISM"] = 'True'
 trainer.remove_callback(MLflowCallback)
 trainer.add_callback(CustomMLflowCallback)
 
-conf.training_args.max_token_length = conf.data_args.max_seq_length
+
+conf.training_args.input_example = pd.DataFrame(DataSet.train[:5])[conf.data_args.feature_col].to_frame()
+add_args_from_dataclass(conf.training_args,conf.model_args) 
+add_args_from_dataclass(conf.training_args,conf.data_args) 
+
+# log the conf as conf.yaml
+
+filename = os.path.join(conf.training_args.output_dir,'code/conf.yaml')
+os.makedirs(os.path.dirname(filename), exist_ok=True)
+conf.training_args.loc = filename
+f = open(filename, 'w+')
+yaml.dump(conf.training_args.__dict__, f, allow_unicode=True,encoding='utf-8')
+f.close()
+
+
 
 # Training
 if conf.training_args.do_train:
@@ -135,6 +154,4 @@ if conf.training_args.do_train:
 if conf.training_args.do_eval:
     logger.info("*** Evaluate ***")
     trainer.evaluate(eval_dataset=DataSet.test)
-
-
 

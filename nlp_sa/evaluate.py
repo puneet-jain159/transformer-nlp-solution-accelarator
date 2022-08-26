@@ -42,9 +42,6 @@ def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
                 "recall": result["overall_recall"],
                 "f1": result["overall_f1"],
                 "accuracy": result["overall_accuracy"]}
-        if len(result) > 1:
-            result["combined_score"] = np.mean(list(result.values())).item()
-            return result
     else:
       raise ValueError("task name not defined")
 
