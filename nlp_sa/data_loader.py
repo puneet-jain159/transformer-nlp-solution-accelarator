@@ -24,7 +24,7 @@ class DataLoader:
         """
         Function to load data from Delta table or HuggingFace DataSet
         """
-
+        # todo: redesign this
         if self.conf.data_args.dataset_name:
             logger.debug(
                 f"Loading the dataset from hugging face dataset: {self.conf.data_args.dataset_name}")
@@ -35,12 +35,6 @@ class DataLoader:
                     split="train",
                     cache_dir=self.conf.model_args.cache_dir,
                     use_auth_token=True if self.conf.model_args.use_auth_token else None)
-
-            if self.conf.data_args.max_train_samples is not None:
-                max_train_samples = min(
-                    len(self.traint), self.conf.data_args.max_train_samples)
-                self.train = self.train.select(range(max_train_samples))
-
             if self.conf.training_args.do_eval:
                 self.test = load_dataset(
                     self.conf.data_args.dataset_name,
@@ -48,12 +42,6 @@ class DataLoader:
                     split="test",
                     cache_dir=self.conf.model_args.cache_dir,
                     use_auth_token=True if self.conf.model_args.use_auth_token else None)
-
-            if self.conf.data_args.max_eval_samples is not None:
-                max_eval_samples = min(
-                    len(self.test),  self.conf.data_args.max_eval_samples)
-                self.test = self.test.select(range(max_eval_samples))
-
         elif self.conf.data_args.database_name:
             logger.debug(
                 f"Loading the data from Database: {self.conf.data_args.database_name}")
@@ -73,6 +61,15 @@ class DataLoader:
                     f"{self.conf.data_args.database_name}.{self.conf.data_args.validation_table}")
                 test = test.toPandas()
                 self.test = Dataset.from_pandas(test)
+        if self.conf.data_args.max_train_samples is not None:
+            max_train_samples = min(
+                len(self.train), self.conf.data_args.max_train_samples)
+            self.train = self.train.select(range(max_train_samples))
+
+        if self.conf.data_args.max_eval_samples is not None:
+            max_eval_samples = min(
+                len(self.test),  self.conf.data_args.max_eval_samples)
+            self.test = self.test.select(range(max_eval_samples))
 
     def get_num_class(self):
         '''

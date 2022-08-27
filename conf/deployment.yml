@@ -1,4 +1,16 @@
 custom:
+
+  # Cluster configs for each environment
+  default-cluster-spec: &default-cluster-spec
+    spark_version: '11.0.x-cpu-ml-scala2.12'
+    node_type_id: 'i3.xlarge' # NOTE: this is an AWS-specific instance type. Change accordingly if running on Azure or GCP.
+    driver_node_type_id: 'i3.xlarge'  # NOTE: this is an AWS-specific instance type. Change accordingly if running on Azure or GCP.
+    num_workers: 1
+
+  cpu-cluster-config: &cpu-cluster-config
+    new_cluster:
+      <<: *default-cluster-spec
+
   basic-cluster-props: &basic-cluster-props
     spark_version: "11.0.x-gpu-ml-scala2.12"
 
@@ -32,3 +44,17 @@ environments:
         notebook_task:
           notebook_path: "/Repos/puneet.jain@databricks.com/transformer-nlp-solution-accelarator_dbx/main_db"
           source: "WORKSPACE"
+
+      - name: 'hugging-face-model-train'
+        <<:
+          - *cpu-cluster-config
+        spark_python_task:
+          python_file: 'file://nlp_sa/pipelines/model_train_job.py'
+          parameters: [ '--base-env', 'file:fuse://conf/.base.env',
+                        '--conf-file', 'file:fuse://conf/pipeline_configs/model_train_multi_class.yaml' ]
+
+      - name: 'hugging-face-model-train-shared-cluster' #use this profile to execute job in interactive cluster
+        spark_python_task:
+          python_file: 'file://nlp_sa/pipelines/model_train_job.py'
+          parameters: [ '--base-env', 'file:fuse://conf/.base.env',
+                        '--conf-file', 'file:fuse://conf/pipeline_configs/model_train_multi_class.yaml' ]

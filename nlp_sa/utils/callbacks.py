@@ -1,18 +1,11 @@
-from transformers.trainer_callback import TrainerCallback
-import functools
 import importlib.util
 import json
-import numbers
 import os
-from glob import glob
-import sys
-import tempfile
+import pathlib
 import shutil
-from pathlib import Path
-from .custom_func import TransformerModel
 
-from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES, is_torch_tpu_available
-
+from transformers.trainer_callback import TrainerCallback
+from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES
 
 logger = logging.get_logger(__name__)
 
@@ -222,9 +215,7 @@ class CustomMLflowCallback(TrainerCallback):
         model_env['dependencies'][-1]['pip'] += PIP_LIBRARIES
 
         # get the code
-        
-        # path = [f'{os.getcwd()}/nlp_sa/utils/custom_func.py']
-        path = [f'{os.getcwd()}/nlp_sa/utils/custom_func.py',args.loc]
+        path = [f'{pathlib.Path(__file__).parent.resolve()}/custom_func.py',args.loc]
         
         print("path: ",path)
         model.save_pretrained(os.path.join(args.output_dir,'current_run/model'))

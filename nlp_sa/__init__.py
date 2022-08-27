@@ -38,9 +38,7 @@ class ConfLoader:
         elif isinstance(conf, str):
             self.loc = conf
             logger.debug(f"Reading the configuration from YAML file in location :{conf}")
-            _yaml_conf = yaml.safe_load(
-                pathlib.Path(f"./{conf}").read_text()
-            )
+            _yaml_conf = yaml.safe_load(pathlib.Path(conf).read_text())
             conf = OmegaConf.create(_yaml_conf)
         return conf
 

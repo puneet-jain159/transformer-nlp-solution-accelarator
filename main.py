@@ -1,3 +1,5 @@
+from nlp_sa.utils.train_utils import get_check_point, log_conf_as_yaml, combine_training_args, get_metric_callable, \
+    apply_preprocessing, detect_checkpoint
 %autoindent
 
 import pandas as pd
@@ -52,42 +54,14 @@ Model = ModelBuilder(conf, DataSet)
 
 
 # Detecting last checkpoint.
-last_checkpoint = None
-if os.path.isdir(conf.training_args.output_dir) and conf.training_args.do_train and not conf.training_args.overwrite_output_dir:
-    last_checkpoint = get_last_checkpoint(conf.training_args.output_dir)
-    if last_checkpoint is None and len(os.listdir(conf.training_args.output_dir)) > 0:
-        raise ValueError(
-            f"Output directory ({conf.training_args.output_dir}) already exists and is not empty. "
-            "Use --overwrite_output_dir to overcome."
-        )
-    elif last_checkpoint is not None and conf.training_args.resume_from_checkpoint is None:
-        logger.info(
-            f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-            "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-        )
+last_checkpoint = detect_checkpoint(conf)
 
-preprocess = partial(preprocess_function, conf=conf,
-                     Dataset=DataSet, Model=Model)
+apply_preprocessing(conf, DataSet, Model)
 
-
-with conf.training_args.main_process_first(desc="dataset map train pre-processing"):
-    DataSet.train = DataSet.train.map(
-        preprocess,
-        batched=True,
-        # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on train dataset")
-
-
-with conf.training_args.main_process_first(desc="dataset map test pre-processing"):
-    DataSet.test = DataSet.test.map(
-        preprocess,
-        batched=True,
-        # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on test dataset")
 
 # Get the metric function
-if conf.training_args.metric_for_best_model is not None:
-    metric = load_metric(conf.model_args.evaluate_metric)
+compute_m = get_metric_callable(conf, DataSet)
+
 
 
 # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
@@ -100,8 +74,12 @@ elif conf.training_args.fp16:
 else:
     data_collator = None
 
+#combine the arguements for trainig
+combine_training_args(conf, DataSet)
 
-compute_m = partial(compute_metrics, conf=conf, metric=metric,Dataset=DataSet)
+# log the conf as conf.yaml
+
+log_conf_as_yaml(conf)
 
 # Initialize our Trainer
 trainer = Trainer(
@@ -125,29 +103,11 @@ trainer.remove_callback(MLflowCallback)
 trainer.add_callback(CustomMLflowCallback)
 
 
-conf.training_args.input_example = pd.DataFrame(DataSet.train[:5])[conf.data_args.feature_col].to_frame()
-add_args_from_dataclass(conf.training_args,conf.model_args) 
-add_args_from_dataclass(conf.training_args,conf.data_args) 
-
-# log the conf as conf.yaml
-
-filename = os.path.join(conf.training_args.output_dir,'code/conf.yaml')
-os.makedirs(os.path.dirname(filename), exist_ok=True)
-conf.training_args.loc = filename
-f = open(filename, 'w+')
-yaml.dump(conf.training_args.__dict__, f, allow_unicode=True,encoding='utf-8')
-f.close()
-
-
 
 # Training
 if conf.training_args.do_train:
-    if conf.training_args.resume_from_checkpoint is not None:
-        checkpoint = conf.training_args.resume_from_checkpoint
-    elif last_checkpoint is not None:
-        checkpoint = last_checkpoint
-    else:
-        checkpoint = None
+    checkpoint = get_check_point(conf, last_checkpoint)
+
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
 # Evaluation
