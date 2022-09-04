@@ -19,9 +19,7 @@ class DataTrainingArguments:
 
     task_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "The task to perform downstream training on."
-        },
+        metadata={"help": "The task to perform downstream training on."},
     )
     dataset_name: Optional[str] = field(
         default=None,
@@ -115,15 +113,11 @@ class DataTrainingArguments:
     )
     train_table: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "A table containing the training delta table"
-        },
+        metadata={"help": "A table containing the training delta table"},
     )
     validation_table: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "A table containing the validation delta table"
-        },
+        metadata={"help": "A table containing the validation delta table"},
     )
     test_table: Optional[str] = field(
         default=None,
@@ -148,9 +142,7 @@ class DataTrainingArguments:
             )
         if self.dataset_name is not None:
             pass
-        elif (
-            self.train_table is None or self.validation_table is None
-        ):
+        elif self.train_table is None or self.validation_table is None:
             raise ValueError(
                 "Need either a GLUE task, a training/validation table or a dataset name."
             )
@@ -230,7 +222,5 @@ class ModelArguments:
     )
     save_as_cpu_model: str = field(
         default=True,
-        metadata={
-            "help": "To serialize and save model for CPU inference"
-        },
+        metadata={"help": "To serialize and save model for CPU inference"},
     )

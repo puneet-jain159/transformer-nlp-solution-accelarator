@@ -1,7 +1,13 @@
 .PHONY: lint black test
 
 lint:
-	python -m flake8 nlp_sa
+	python -m flake8 src
 
 black:
-	python -m black --line-length 70 nlp_sa/utils
+	python -m black --line-length 79 src/
+
+test:
+	pytest tests
+
+coverage:
+	pytest --cov=src tests/

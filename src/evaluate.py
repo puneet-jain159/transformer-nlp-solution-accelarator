@@ -17,9 +17,7 @@ def compute_metrics(p: EvalPrediction, conf, metric, dataset):
         elif conf.data_args.task_name == "ner":
             result = _compute_metrics_ner(p, conf, metric, dataset)
         else:
-            raise ValueError(
-                "task not implemented please implement the task"
-            )
+            raise ValueError("task not implemented please implement the task")
     return result
 
 
@@ -50,27 +48,13 @@ def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
                 "precision": result["overall_precision"],
                 "recall": result["overall_recall"],
                 "f1": result["overall_f1"],
-<<<<<<< HEAD
                 "accuracy": result["overall_accuracy"]}
-=======
-                "accuracy": result["overall_accuracy"],
-            }
-        if len(result) > 1:
-            result["combined_score"] = np.mean(
-                list(result.values())
-            ).item()
-            return result
->>>>>>> parent of 512300e (lint)
     else:
         raise ValueError("task name not defined")
 
 
 def _compute_metrics_ner(
-    examples,
-    conf,
-    metric,
-    dataset,
-    special_token_ids=[-100]
+    examples, conf, metric, dataset, special_token_ids=[-100]
 ):
     """
     Function to compute the metric of NER Task
@@ -83,9 +67,7 @@ def _compute_metrics_ner(
         predictions.remove(special_token)
         labels.remove(special_token)
 
-    results = metric.compute(
-        predictions=predictions, references=labels
-    )
+    results = metric.compute(predictions=predictions, references=labels)
 
     if conf.data_args.return_entity_level_metrics:
         # Unpack nested dictionaries
