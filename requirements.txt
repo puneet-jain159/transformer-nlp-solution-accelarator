@@ -2,11 +2,14 @@
 torch
 transformers==4.21.1
 datasets
+pyarrow
 numpy
 pandas
+omegaconf
 seqeval
 setuptools
 wheel
+pyyaml
 pytest
 pytest-cov
 dbx
