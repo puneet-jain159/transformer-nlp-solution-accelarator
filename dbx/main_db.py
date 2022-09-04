@@ -9,6 +9,10 @@ import os
 import pandas as pd
 import yaml
 
+log4jLogger = sc._jvm.org.apache.log4j
+logger = log4jLogger.LogManager.getLogger("runner")
+logger.info("pyspark script logger initialized")
+
 from functools import partial
 from transformers import (
     DataCollatorWithPadding,
@@ -37,9 +41,6 @@ yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
     )
 # COMMAND ----------
 
-log4jLogger = sc._jvm.org.apache.log4j
-logger = log4jLogger.LogManager.getLogger("runner")
-logger.info("pyspark script logger initialized")
 
 conf = ConfLoader('conf/model_multi_class.yaml')
 # log_level = conf.training_args.log_level
