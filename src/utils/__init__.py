@@ -12,7 +12,7 @@ def get_config(config_file: str) -> Namespace:
       A Namespace object that contans configurations referenced
       in the program.
     """
-    stream = open(config_file, 'r')
+    stream = open(config_file, "r")
     config_dict = yaml.load(stream, yaml.SafeLoader)
 
     for parameter, value in config_dict.items():
@@ -33,7 +33,6 @@ def get_label_list(labels):
     label_list = list(unique_labels)
     label_list.sort()
     return label_list
-
 
 def add_args_from_dataclass(class1,class2):
     '''

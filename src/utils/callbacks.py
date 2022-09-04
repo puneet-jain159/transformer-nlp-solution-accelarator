@@ -1,11 +1,21 @@
+from transformers.trainer_callback import TrainerCallback
+import functools
 import importlib.util
 import json
+import numbers
 import os
-import pathlib
-import shutil
+from glob import glob
+import sys
+import tempfile
+from pathlib import Path
+from .pyfunc_wrapper import TransformerModel
 
-from transformers.trainer_callback import TrainerCallback
-from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES
+from transformers.utils import (
+    flatten_dict,
+    logging,
+    ENV_VARS_TRUE_VALUES,
+)
+
 
 logger = logging.get_logger(__name__)
 
@@ -29,11 +39,16 @@ class CustomMLflowCallback(TrainerCallback):
     def __init__(self):
         if not is_mlflow_available():
             raise RuntimeError(
-                "MLflowCallback requires mlflow to be installed. Run `pip install mlflow`.")
+                "MLflowCallback requires mlflow to be installed. Run `pip install mlflow`."
+            )
         import mlflow
 
-        self._MAX_PARAM_VAL_LENGTH = mlflow.utils.validation.MAX_PARAM_VAL_LENGTH
-        self._MAX_PARAMS_TAGS_PER_BATCH = mlflow.utils.validation.MAX_PARAMS_TAGS_PER_BATCH
+        self._MAX_PARAM_VAL_LENGTH = (
+            mlflow.utils.validation.MAX_PARAM_VAL_LENGTH
+        )
+        self._MAX_PARAMS_TAGS_PER_BATCH = (
+            mlflow.utils.validation.MAX_PARAMS_TAGS_PER_BATCH
+        )
 
         self._initialized = False
         self._auto_end_run = False
@@ -67,15 +82,23 @@ class CustomMLflowCallback(TrainerCallback):
             MLFLOW_FLATTEN_PARAMS (`str`, *optional*):
                 Whether to flatten the parameters dictionary before logging. Default to `False`.
         """
-        self._log_artifacts = os.getenv(
-            "HF_MLFLOW_LOG_ARTIFACTS", "FALSE").upper() in ENV_VARS_TRUE_VALUES
-        self._nested_run = os.getenv(
-            "MLFLOW_NESTED_RUN", "FALSE").upper() in ENV_VARS_TRUE_VALUES
+        self._log_artifacts = (
+            os.getenv("HF_MLFLOW_LOG_ARTIFACTS", "FALSE").upper()
+            in ENV_VARS_TRUE_VALUES
+        )
+        self._nested_run = (
+            os.getenv("MLFLOW_NESTED_RUN", "FALSE").upper()
+            in ENV_VARS_TRUE_VALUES
+        )
         self._experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", None)
-        self._flatten_params = os.getenv(
-            "MLFLOW_FLATTEN_PARAMS", "FALSE").upper() in ENV_VARS_TRUE_VALUES
-        self._create_model = os.getenv(
-            "CREATE_MFLOW_MODEL", "FALSE").upper() in ENV_VARS_TRUE_VALUES
+        self._flatten_params = (
+            os.getenv("MLFLOW_FLATTEN_PARAMS", "FALSE").upper()
+            in ENV_VARS_TRUE_VALUES
+        )
+        self._create_model = (
+            os.getenv("CREATE_MFLOW_MODEL", "FALSE").upper()
+            in ENV_VARS_TRUE_VALUES
+        )
         self._run_id = os.getenv("MLFLOW_RUN_ID", None)
         self._parent_run_id = None
         self._tracking_uri = os.getenv("MLFLOW_TRACKING_URI", None)
@@ -87,25 +110,37 @@ class CustomMLflowCallback(TrainerCallback):
             f" tags={self._nested_run}"
         )
         if state.is_world_process_zero:
-            if self._ml_flow.active_run() is None or self._nested_run or self._run_id:
+            if (
+                self._ml_flow.active_run() is None
+                or self._nested_run
+                or self._run_id
+            ):
                 if self._experiment_name:
                     # Use of set_experiment() ensure that Experiment is created if not exists
                     self._ml_flow.set_experiment(self._experiment_name)
                 self._ml_flow.start_run(
-                    run_name=args.run_name, nested=self._nested_run)
+                    run_name=args.run_name, nested=self._nested_run
+                )
                 logger.info(
-                    f"MLflow run started with run_id={self._ml_flow.active_run().info.run_id}")
+                    f"MLflow run started with run_id={self._ml_flow.active_run().info.run_id}"
+                )
                 if self._parent_run_id is None:
-                    self._parent_run_id = self._ml_flow.active_run().info.run_id
+                    self._parent_run_id = (
+                        self._ml_flow.active_run().info.run_id
+                    )
                     logger.warning(
-                        f"setting parent run id {str(self._parent_run_id)}")
+                        f"setting parent run id {str(self._parent_run_id)}"
+                    )
                 self._auto_end_run = True
             combined_dict = args.to_dict()
             if hasattr(model, "config") and model.config is not None:
                 model_config = model.config.to_dict()
                 combined_dict = {**model_config, **combined_dict}
-            combined_dict = flatten_dict(
-                combined_dict) if self._flatten_params else combined_dict
+            combined_dict = (
+                flatten_dict(combined_dict)
+                if self._flatten_params
+                else combined_dict
+            )
             # remove params that are too long for MLflow
             for name, value in list(combined_dict.items()):
                 # internally, all values are converted to str in MLflow
@@ -119,9 +154,18 @@ class CustomMLflowCallback(TrainerCallback):
                     del combined_dict[name]
             # MLflow cannot log more than 100 values in one go, so we have to split it
             combined_dict_items = list(combined_dict.items())
-            for i in range(0, len(combined_dict_items), self._MAX_PARAMS_TAGS_PER_BATCH):
+            for i in range(
+                0,
+                len(combined_dict_items),
+                self._MAX_PARAMS_TAGS_PER_BATCH,
+            ):
                 self._ml_flow.log_params(
-                    dict(combined_dict_items[i: i + self._MAX_PARAMS_TAGS_PER_BATCH]))
+                    dict(
+                        combined_dict_items[
+                            i : i + self._MAX_PARAMS_TAGS_PER_BATCH
+                        ]
+                    )
+                )
             mlflow_tags = os.getenv("MLFLOW_TAGS", None)
             if mlflow_tags:
                 mlflow_tags = json.loads(mlflow_tags)
@@ -148,26 +192,134 @@ class CustomMLflowCallback(TrainerCallback):
                     )
             self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
 
-    def on_epoch_begin(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
-        logger.warning(f"start epoch {args.save_strategy}")
+    def on_epoch_begin(
+        self,
+        args,
+        state,
+        control,
+        model=None,
+        tokenizer=None,
+        train_dataloader=None,
+        **kwargs,
+    ):
 
-        if args.save_strategy == 'epoch':
+        if (
+            self._auto_end_run
+            and self._ml_flow.active_run()
+            and self._parent_run_id != self._ml_flow.active_run().info.run_id
+        ):
             logger.warning("terminate run")
-            self.__initalize_nested_run(state, args, model)
+            self._ml_flow.end_run()
 
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
+        if state.is_world_process_zero:
+            self._ml_flow.start_run(
+                run_name=args.run_name, nested=self._nested_run
+            )
+            logger.debug(
+                f"Epoch started MLflow run started with run_id={self._ml_flow.active_run().info.run_id}"
+            )
+            self._auto_end_run = True
+            combined_dict = args.to_dict()
+            if hasattr(model, "config") and model.config is not None:
+                model_config = model.config.to_dict()
+                combined_dict = {**model_config, **combined_dict}
+            combined_dict = (
+                flatten_dict(combined_dict)
+                if self._flatten_params
+                else combined_dict
+            )
+            # remove params that are too long for MLflow
+            for name, value in list(combined_dict.items()):
+                # internally, all values are converted to str in MLflow
+                if len(str(value)) > self._MAX_PARAM_VAL_LENGTH:
+                    logger.warning(
+                        f'trainer is attempting to log a value of "{value}" for key "{name}" as a parameter. MLflow\'s'
+                        " log_param() only accepts values no longer than 250 characters so we dropped this attribute."
+                        " You can use `MLFLOW_FLATTEN_PARAMS` environment variable to flatten the parameters and"
+                        " avoid this message."
+                    )
+                    del combined_dict[name]
+            # MLflow cannot log more than 100 values in one go, so we have to split it
+            combined_dict_items = list(combined_dict.items())
+            for i in range(
+                0,
+                len(combined_dict_items),
+                self._MAX_PARAMS_TAGS_PER_BATCH,
+            ):
+                self._ml_flow.log_params(
+                    dict(
+                        combined_dict_items[
+                            i : i + self._MAX_PARAMS_TAGS_PER_BATCH
+                        ]
+                    )
+                )
+            mlflow_tags = os.getenv("MLFLOW_TAGS", None)
+            if mlflow_tags:
+                mlflow_tags = json.loads(mlflow_tags)
+                self._ml_flow.set_tags(mlflow_tags)
+
+    def on_epoch_end(
+        self,
+        args,
+        state,
+        control,
+        model=None,
+        tokenizer=None,
+        train_dataloader=None,
+        **kwargs,
+    ):
 
         if self._create_model:
             logger.debug("Creating Custom Pyfunc Model")
 
-            if args.save_strategy == 'epoch':
-                self._log_ml_flow_model(
-                    args, state, control, model, tokenizer, train_dataloader)
+            if args.save_as_cpu_model:
+                model = model.to("cpu")
+            transformer_model = TransformerModel(
+                tokenizer=tokenizer,
+                model=model,
+                max_token_length=args.max_token_length,
+                task_name=args.task_name,
+            )
 
-    def on_train_end(self, args, state, control, model=None, tokenizer=None, train_dataloader=None, **kwargs):
+            # Create conda environment
+            with open("requirements.txt", "r") as additional_requirements:
+                libraries = additional_requirements.readlines()
+                libraries = [library.rstrip() for library in libraries]
 
-        if (self._auto_end_run and self._ml_flow.active_run()
-                and (self._parent_run_id != self._ml_flow.active_run().info.run_id)):
+            model_env = self._ml_flow.pyfunc.get_default_conda_env()
+            model_env["dependencies"][-1]["pip"] += libraries
+
+            input_example = train_dataloader.dataset.data[:5].to_pandas()
+
+            # get the code
+            path = [f"{os.getcwd()}/nlp_sa", f"{os.getcwd()}/conf"]
+
+            self._ml_flow.pyfunc.log_model(
+                "mlflow_model",
+                python_model=transformer_model,
+                conda_env=model_env,
+                code_path=path,
+                input_example=input_example,
+            )
+
+            model = model.to("cuda" if args.n_gpu > 0 else "cpu")
+
+    def on_train_end(
+        self,
+        args,
+        state,
+        control,
+        model=None,
+        tokenizer=None,
+        train_dataloader=None,
+        **kwargs,
+    ):
+
+        if (
+            self._auto_end_run
+            and self._ml_flow.active_run()
+            and (self._parent_run_id != self._ml_flow.active_run().info.run_id)
+        ):
             logger.debug("terminating child run")
             self._ml_flow.end_run()
 
@@ -180,16 +332,53 @@ class CustomMLflowCallback(TrainerCallback):
 
             if self._create_model:
                 logger.info("Creating Custom Pyfunc Model")
-                self._log_ml_flow_model(
-                    args, state, control, model, tokenizer, train_dataloader)
+
+                if args.save_as_cpu_model:
+                    model = model.to("cpu")
+
+                transformer_model = TransformerModel(
+                    tokenizer=tokenizer,
+                    model=model,
+                    max_token_length=args.max_token_length,
+                    task_name=args.task_name,
+                )
+
+                # Create conda environment
+                with open("requirements.txt", "r") as additional_requirements:
+                    libraries = additional_requirements.readlines()
+                    libraries = [library.rstrip() for library in libraries]
+
+                model_env = self._ml_flow.pyfunc.get_default_conda_env()
+                model_env["dependencies"][-1]["pip"] += libraries
+
+                input_example = train_dataloader.dataset.data[:5].to_pandas()
+
+                # get the code
+                path = [
+                    f"{os.getcwd()}/nlp_sa",
+                    f"{os.getcwd()}/conf",
+                ]
+
+                self._ml_flow.pyfunc.log_model(
+                    "mlflow_model",
+                    python_model=transformer_model,
+                    conda_env=model_env,
+                    code_path=path,
+                    input_example=input_example,
+                )
+
+                model = model.to("cuda" if args.n_gpu > 0 else "cpu")
 
     def on_evaluate(self, args, state, control, **kwargs):
         """
         Event called after an evaluation phase.
         """
         logger.debug("Evaluate has been called")
-        if (self._auto_end_run and self._ml_flow.active_run()
-                and (self._parent_run_id == self._ml_flow.active_run().info.run_id)):
+        if (
+            self._auto_end_run
+            and self._ml_flow.active_run()
+            and (self._parent_run_id == self._ml_flow.active_run().info.run_id)
+        ):
             logger.debug("terminating parent run")
             self._ml_flow.end_run()
 

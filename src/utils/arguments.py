@@ -1,10 +1,9 @@
-
 from dataclasses import dataclass, field
 from typing import Optional
 
 task_to_keys = {
     "multi-class": ("sentence", None),
-    "ner": ("sentence1", None)
+    "ner": ("sentence1", None),
 }
 
 
@@ -19,13 +18,20 @@ class DataTrainingArguments:
     """
 
     task_name: Optional[str] = field(
-        default=None,metadata={"help": "The task to perform downstream training on."}
+        default=None,
+        metadata={"help": "The task to perform downstream training on."},
     )
     dataset_name: Optional[str] = field(
-        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
+        default=None,
+        metadata={
+            "help": "The name of the dataset to use (via the datasets library)."
+        },
     )
     dataset_config_name: Optional[str] = field(
-        default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
+        default=None,
+        metadata={
+            "help": "The configuration name of the dataset to use (via the datasets library)."
+        },
     )
     max_seq_length: int = field(
         default=128,
@@ -37,7 +43,10 @@ class DataTrainingArguments:
         },
     )
     overwrite_cache: bool = field(
-        default=False, metadata={"help": "Overwrite the cached preprocessed datasets or not."}
+        default=False,
+        metadata={
+            "help": "Overwrite the cached preprocessed datasets or not."
+        },
     )
     pad_to_max_length: bool = field(
         default=True,
@@ -77,19 +86,11 @@ class DataTrainingArguments:
     )
     label_col: Optional[str] = field(
         default="label",
-        metadata={
-            "help": (
-                "the name of the label_Column"
-            )
-        },
+        metadata={"help": ("the name of the label_Column")},
     )
     feature_col: Optional[str] = field(
         default=None,
-        metadata={
-            "help": (
-                "the name of the label_Column"
-            )
-        },
+        metadata={"help": ("the name of the label_Column")},
     )
     label_all_tokens: bool = field(
         default=False,
@@ -102,34 +103,49 @@ class DataTrainingArguments:
     )
     return_entity_level_metrics: bool = field(
         default=False,
-        metadata={"help": "Whether to return all the entity levels during evaluation or just the overall ones."},
+        metadata={
+            "help": "Whether to return all the entity levels during evaluation or just the overall ones."
+        },
     )
     database_name: Optional[str] = field(
-        default="default", metadata={"help": "The database name to use with the table"}
+        default="default",
+        metadata={"help": "The database name to use with the table"},
     )
     train_table: Optional[str] = field(
-        default=None, metadata={"help": "A table containing the training delta table"}
+        default=None,
+        metadata={"help": "A table containing the training delta table"},
     )
     validation_table: Optional[str] = field(
-        default=None, metadata={"help": "A table containing the validation delta table"}
+        default=None,
+        metadata={"help": "A table containing the validation delta table"},
     )
     test_table: Optional[str] = field(
-        default=None, metadata={"help": "A delta table containing the test data."})
+        default=None,
+        metadata={"help": "A delta table containing the test data."},
+    )
 
     def __post_init__(self):
         if self.task_name is not None:
             self.task_name = self.task_name.lower()
             if self.task_name not in task_to_keys.keys():
                 raise ValueError(
-                    "Unknown task, you should pick one in " + ",".join(task_to_keys.keys()))
-        if self.dataset_name is not None and self.train_table is not None and self.validation_table is not None:
+                    "Unknown task, you should pick one in "
+                    + ",".join(task_to_keys.keys())
+                )
+        if (
+            self.dataset_name is not None
+            and self.train_table is not None
+            and self.validation_table is not None
+        ):
             raise ValueError(
-                "Either dataset name or a training/validation table should ne specified")
+                "Either dataset name or a training/validation table should ne specified"
+            )
         if self.dataset_name is not None:
             pass
         elif self.train_table is None or self.validation_table is None:
             raise ValueError(
-                "Need either a GLUE task, a training/validation table or a dataset name.")
+                "Need either a GLUE task, a training/validation table or a dataset name."
+            )
 
 
 @dataclass
@@ -140,34 +156,50 @@ class ModelArguments:
 
     model_name_or_path: str = field(
         metadata={
-            "help": "Path to pretrained model or model identifier from huggingface.co/models"}
+            "help": "Path to pretrained model or model identifier from huggingface.co/models"
+        }
     )
     experiment_location: Optional[str] = field(
-        default="default", metadata={"help": "Location to store the experimenttraining_args.get_process_log_level()"}
+        default="default",
+        metadata={
+            "help": "Location to store the experimenttraining_args.get_process_log_level()"
+        },
     )
     config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+        default=None,
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
     )
     is_regression: Optional[bool] = field(
-        default=False, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+        default=False,
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
     )
     tokenizer_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+        default=None,
+        metadata={
+            "help": "Pretrained tokenizer name or path if not the same as model_name"
+        },
     )
     cache_dir: Optional[str] = field(
         default=None,
         metadata={
-            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"
+        },
     )
     use_fast_tokenizer: bool = field(
         default=True,
         metadata={
-            "help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
+            "help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."
+        },
     )
     model_revision: str = field(
         default="main",
         metadata={
-            "help": "The specific model version to use (can be a branch name, tag name or commit id)."},
+            "help": "The specific model version to use (can be a branch name, tag name or commit id)."
+        },
     )
     use_auth_token: bool = field(
         default=False,
@@ -181,15 +213,14 @@ class ModelArguments:
     ignore_mismatched_sizes: bool = field(
         default=False,
         metadata={
-            "help": "Will enable to load a pretrained model whose head dimensions are different."},
+            "help": "Will enable to load a pretrained model whose head dimensions are different."
+        },
     )
     evaluate_metric: str = field(
         default="seqeval",
-        metadata={
-            "help": "Metric to use with evaluate sequence"},
+        metadata={"help": "Metric to use with evaluate sequence"},
     )
     save_as_cpu_model: str = field(
         default=True,
-        metadata={
-            "help": "To serialize and save model for CPU inference"},
+        metadata={"help": "To serialize and save model for CPU inference"},
     )
