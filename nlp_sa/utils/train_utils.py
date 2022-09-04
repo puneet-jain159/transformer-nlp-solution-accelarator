@@ -7,13 +7,12 @@ import pandas as pd
 import yaml
 
 from nlp_sa.utils.logger_utils import get_logger
-from transformers.utils import logging
 from nlp_sa.utils import add_args_from_dataclass
 from nlp_sa.evaluate import compute_metrics
 from nlp_sa.preprocess import preprocess_function
 
-logger = logging.get_logger(__name__)
-# logger = get_logger()
+
+logger = get_logger()
 
 
 def detect_checkpoint(conf):
@@ -59,7 +58,7 @@ def apply_preprocessing(conf, dataset, model):
 def get_metric_callable(conf, data_loader):
     # Get the metric function
     if conf.training_args.metric_for_best_model is not None:
-        metric = load_metric(conf.model_args.evaluate_metric)
+        metric = load_metric(conf.training_args.metric_for_best_model)
 
     return partial(compute_metrics, conf=conf, metric=metric, Dataset=data_loader)
 
