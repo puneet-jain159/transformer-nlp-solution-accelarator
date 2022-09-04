@@ -48,6 +48,4 @@ class TransformerModel(mlflow.pyfunc.PythonModel):
             )
 
         else:
-            raise ValueError(
-                "The task is not defined please define the task"
-            )
+            raise ValueError("The task is not defined please define the task")
