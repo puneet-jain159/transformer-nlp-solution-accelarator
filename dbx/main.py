@@ -17,6 +17,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import MLflowCallback
 from datasets import load_metric, list_metrics
 
+<<<<<<< HEAD
 from src.preprocess import preprocess_function
 from src.model_builder import ModelBuilder
 from src.data_loader import DataLoader
@@ -25,6 +26,14 @@ from src.utils.callbacks import CustomMLflowCallback
 from src.evaluate import compute_metrics
 from src.utils.train_utils import get_check_point, log_conf_as_yaml, combine_training_args, get_metric_callable, \
     apply_preprocessing, detect_checkpoint
+=======
+from nlp_sa.preprocess import preprocess_function
+from nlp_sa.model_builder import ModelBuilder
+from nlp_sa.data_loader import DataLoader
+from nlp_sa import ConfLoader
+from nlp_sa.utils.callbacks import CustomMLflowCallback
+from nlp_sa.evaluate import compute_metrics
+>>>>>>> parent of b94e307 (pytest)
 
 
 yaml.SafeDumper.yaml_representers[None] = lambda self, data: \

@@ -1,5 +1,5 @@
 from setuptools import find_packages, setup
-from src import __version__
+from nlp_sa import __version__
 
 setup(
     name="nlp_sa",

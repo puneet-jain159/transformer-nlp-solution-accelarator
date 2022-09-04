@@ -2,12 +2,19 @@
 torch
 transformers==4.21.1
 datasets
+pyarrow
 numpy
 pandas
+omegaconf
 seqeval
 setuptools
 wheel
+pyyaml
 pytest
 pytest-cov
+<<<<<<< HEAD
 dbx
 python-dotenv
+=======
+dbx
+>>>>>>> parent of b94e307 (pytest)
