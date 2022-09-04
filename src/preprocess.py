@@ -9,9 +9,13 @@ def preprocess_function(examples, conf, Dataset, Model):
                 examples, conf, Dataset, Model
             )
         elif conf.data_args.task_name == "ner":
-            result = _preprocess_function_ner(examples, conf, Dataset, Model)
+            result = _preprocess_function_ner(
+                examples, conf, Dataset, Model
+            )
         else:
-            raise ValueError("task not implemented please implement the task")
+            raise ValueError(
+                "task not implemented please implement the task"
+            )
     return result
 
 
@@ -22,7 +26,9 @@ def _preprocess_function_multi_class(examples, conf, Dataset, Model):
     # Tokenize the texts
     args = (examples[conf.data_args.feature_col],)
     result = Model.tokenizer(
-        *args, max_length=conf.data_args.max_seq_length, truncation=True
+        *args,
+        max_length=conf.data_args.max_seq_length,
+        truncation=True
     )
 
     return result
@@ -43,7 +49,9 @@ def _preprocess_function_ner(examples, conf, dataset, model):
             )
         else:
             b_to_i_label.append(idx)
-    padding = "max_length" if conf.data_args.pad_to_max_length else False
+    padding = (
+        "max_length" if conf.data_args.pad_to_max_length else False
+    )
 
     """We use is_split_into_words because the texts in our dataset
     are lists of words (with a label for each word)."""
@@ -74,7 +82,9 @@ def _preprocess_function_ner(examples, conf, dataset, model):
                 the label_all_tokens flag."""
                 if conf.data_args.label_all_tokens:
                     label_ids.append(
-                        b_to_i_label[dataset.label_to_id[label[word_idx]]]
+                        b_to_i_label[
+                            dataset.label_to_id[label[word_idx]]
+                        ]
                     )
                 else:
                     label_ids.append(-100)

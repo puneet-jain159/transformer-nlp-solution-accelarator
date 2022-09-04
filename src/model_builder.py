@@ -20,6 +20,7 @@ class ModelBuilder:
         self,
         dataset=None,
         use_auth_token=None,
+<<<<<<< HEAD
         ignore_mismatched_sizes=True,
         task_name="text-classification",
         cache_dir="/tmp/hf_cache/",
@@ -29,6 +30,9 @@ class ModelBuilder:
         config_name=None,
         use_fast_tokenizer=False,
         max_seq_length=1024
+=======
+        ignore_mismatched_sizes=True
+>>>>>>> parent of 512300e (lint)
     ):
         self._dataset = dataset
         self._label_to_id = None
@@ -53,12 +57,23 @@ class ModelBuilder:
         # Load Config
         # TODO: confirm if this is needed: self.dataset.get_num_class()
         self.config = AutoConfig.from_pretrained(
+<<<<<<< HEAD
             self._config_name,
             num_labels=self._dataset.num_labels,
             finetuning_task=self._task_name,
             cache_dir=self._cache_dir,
             revision=self._model_revision,
             use_auth_token=self._use_auth_token,
+=======
+            self.conf.model_args.config_name
+            if self.conf.model_args.config_name
+            else self.conf.model_args.model_name_or_path,
+            num_labels=self.dataset.num_labels,
+            finetuning_task=self.conf.data_args.task_name,
+            cache_dir=self.conf.model_args.cache_dir,
+            revision=self.conf.model_args.model_revision,
+            use_auth_token=self.use_auth_token
+>>>>>>> parent of 512300e (lint)
         )
 
     def _load_tokenizer(self):
@@ -67,6 +82,7 @@ class ModelBuilder:
         """
         if self.config.model_type in {"gpt2", "roberta"}:
             self.tokenizer = AutoTokenizer.from_pretrained(
+<<<<<<< HEAD
                 self._tokenizer_name,
                 cache_dir=self._cache_dir,
                 use_fast=self._use_fast_tokenizer,
@@ -80,6 +96,25 @@ class ModelBuilder:
                 use_fast=self._use_fast_tokenizer,
                 revision=self._model_revision,
                 use_auth_token=self._use_auth_token,
+=======
+                self.conf.model_args.tokenizer_name
+                if self.conf.model_args.tokenizer_name
+                else self.conf.model_args.model_name_or_path,
+                cache_dir=self.conf.model_args.cache_dir,
+                use_fast=self.conf.model_args.use_fast_tokenizer,
+                revision=self.conf.model_args.model_revision,
+                use_auth_token=self.use_auth_token
+            )
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.conf.model_args.tokenizer_name
+                if self.conf.model_args.tokenizer_name
+                else self.conf.model_args.model_name_or_path,
+                cache_dir=self.conf.model_args.cache_dir,
+                use_fast=self.conf.model_args.use_fast_tokenizer,
+                revision=self.conf.model_args.model_revision,
+                use_auth_token=self.use_auth_token
+>>>>>>> parent of 512300e (lint)
             )
 
         # Correct the sequence length incase of any mismatch
@@ -104,8 +139,15 @@ class ModelBuilder:
         Function to load the model architecture with the specific task name
         """
 
+<<<<<<< HEAD
         if self._task_name == "multi-class":
             from_tf = bool(".ckpt" in self._model_name_or_path)
+=======
+        if self.conf.data_args.task_name == "multi-class":
+            from_tf = bool(
+                ".ckpt" in self.conf.model_args.model_name_or_path
+            )
+>>>>>>> parent of 512300e (lint)
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 self.conf.model_args.model_name_or_path,
                 from_tf=from_tf,
@@ -113,7 +155,7 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
                 use_auth_token=self.use_auth_token,
-                ignore_mismatched_sizes=self.ignore_mismatched_sizes,
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes
             )
         elif self.conf.data_args.task_name == "ner":
             self.model = AutoModelForTokenClassification.from_pretrained(
@@ -125,10 +167,12 @@ class ModelBuilder:
                 cache_dir=self.conf.model_args.cache_dir,
                 revision=self.conf.model_args.model_revision,
                 use_auth_token=self.use_auth_token,
-                ignore_mismatched_sizes=self.ignore_mismatched_sizes,
+                ignore_mismatched_sizes=self.ignore_mismatched_sizes
             )
         else:
-            raise ValueError("Model not created for the particular task")
+            raise ValueError(
+                "Model not created for the particular task"
+            )
 
     def correct_label_to_id(self):
         """
@@ -156,7 +200,8 @@ class ModelBuilder:
         if self.label_to_id is not None:
             self.model.config.label2id = self.label_to_id
             self.model.config.id2label = {
-                id: label for label, id in self.config.label2id.items()
+                id: label
+                for label, id in self.config.label2id.items()
             }
         elif (
             self.data_args.task_name is not None
@@ -166,7 +211,8 @@ class ModelBuilder:
                 l: i for i, l in enumerate(self.Dataset.label_list)
             }
             self.model.config.id2label = {
-                id: label for label, id in self.config.label2id.items()
+                id: label
+                for label, id in self.config.label2id.items()
             }
 
     def _correct_ner_label(self):
@@ -176,11 +222,13 @@ class ModelBuilder:
         # Model has labels -> use them.
         if (
             self.model.config.label2id
-            != PretrainedConfig(num_labels=self.Dataset.num_labels).label2id
+            != PretrainedConfig(
+                num_labels=self.Dataset.num_labels
+            ).label2id
         ):
-            if list(sorted(self.model.config.label2id.keys())) == list(
-                sorted(self.Dataset.label_list)
-            ):
+            if list(
+                sorted(self.model.config.label2id.keys())
+            ) == list(sorted(self.Dataset.label_list)):
                 # Reorganize `label_list` to match the ordering of the model.
                 labels_are_int = isinstance(
                     self.Dataset.train.features[
@@ -203,7 +251,8 @@ class ModelBuilder:
                         for i in range(self.Dataset.num_labels)
                     ]
                     self.label_to_id = {
-                        l: i for i, l in enumerate(self.Dataset.label_list)
+                        l: i
+                        for i, l in enumerate(self.Dataset.label_list)
                     }
             else:
                 logger.warning(

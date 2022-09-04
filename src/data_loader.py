@@ -14,19 +14,19 @@ class DataLoader:
     def __init__(
         self,
         dataset_name,
-        dataset_config_name=None,
-        cache_dir="/tmp/",
-        use_auth_token=None,
-        max_train_samples=None,
-        max_eval_samples=None,
-        database_name=None,
-        do_eval=True,
-        do_train=True,
-        train_split="train",
-        eval_split="test",
-        train_table=None,
-        validation_table=None,
-        spark=None,
+        dataset_config_name = None,
+        cache_dir = "/tmp/",
+        use_auth_token = None,
+        max_train_samples = None,
+        max_eval_samples = None,
+        database_name = None,
+        do_eval = True,
+        do_train = True,
+        train_split = "train",
+        eval_split = "test",
+        train_table = None,
+        validation_table = None,
+        spark = None
     ):
         self._dataset_name = dataset_name
         self._dataset_config_name = dataset_config_name
@@ -45,9 +45,8 @@ class DataLoader:
         self._validation_table = validation_table
         self._spark = spark
 
-        if (self._database_name and not self._spark) or (
-            self._spark and not self._database_name
-        ):
+        if ((self._database_name and not self._spark) or 
+        (self._spark and not self._database_name)):
             raise ValueError(
                 """Invalid arguments - make sure to pass a Spark session
                 object if you want to read data from a Hive Table using Spark"""
@@ -64,7 +63,10 @@ class DataLoader:
             feature_set = self.test.features
 
         for feature_id in feature_set.keys():
-            if isinstance(feature_set[feature_id], ClassLabel):
+            if isinstance(
+                feature_set[feature_id],
+                ClassLabel
+            ):
                 return feature_id
 
     def _load_dataset(self):
@@ -79,11 +81,11 @@ class DataLoader:
             )
             if self._do_train:
                 self.train = load_dataset(
-                    path=self._dataset_name,
-                    download_config=self._dataset_config_name,
+                    path = self._dataset_name,
+                    download_config = self._dataset_config_name,
                     split=self._train_split,
                     cache_dir=self._cache_dir,
-                    use_auth_token=self._use_auth_token,
+                    use_auth_token=self._use_auth_token
                 )
 
             if self._max_train_samples is not None:
@@ -91,15 +93,17 @@ class DataLoader:
                     len(self.train),
                     self._max_train_samples,
                 )
-                self.train = self.train.select(range(max_train_samples))
+                self.train = self.train.select(
+                    range(max_train_samples)
+                )
 
             if self._do_eval:
                 self.test = load_dataset(
-                    path=self._dataset_name,
-                    download_config=self._dataset_config_name,
+                    path = self._dataset_name,
+                    download_config = self._dataset_config_name,
                     split=self._eval_split,
                     cache_dir=self._cache_dir,
-                    use_auth_token=self._use_auth_token,
+                    use_auth_token=self._use_auth_token
                 )
 
             if self._max_eval_samples is not None:
@@ -110,6 +114,7 @@ class DataLoader:
                 self.test = self.test.select(range(max_eval_samples))
 
             self._label_col = self._get_label_col()
+
 
         elif self._database_name:
             logger.debug(
@@ -150,7 +155,9 @@ class DataLoader:
             # ToDo change the label_col to label_names
             if not is_regression:
                 if self._task_name == "multi-class":
-                    self._num_labels = self._get_num_class_multi_class()
+                    self._num_labels = (
+                        self._get_num_class_multi_class()
+                    )
                 elif self.conf.data_args.task_name == "ner":
                     self._num_labels = self._get_num_class_ner()
             else:
@@ -173,7 +180,9 @@ class DataLoader:
         Function to get num of classes for mult-class
         """
 
-        self._label_list = self.train.unique(self._label_col)
+        self._label_list = self.train.unique(
+            self._label_col
+        )
         # Let's sort it for determinism
         self._label_list.sort()
         return len(self._label_list)
@@ -188,16 +197,24 @@ class DataLoader:
         the list of labels manually."""
 
         labels_are_int = isinstance(
-            self.train.features[self._label_col].feature,
+            self.train.features[
+                self._label_col
+            ].feature,
             ClassLabel,
         )
         if labels_are_int:
             self._label_list = self.train.features[
                 self._label_col
             ].feature.names
-            self._label_to_id = {i: i for i in range(len(self._label_list))}
+            self._label_to_id = {
+                i: i for i in range(len(self._label_list))
+            }
         else:
-            self._label_list = get_label_list(self.train[self._label_col])
-            self._label_to_id = {l: i for i, l in enumerate(self._label_list)}
+            self._label_list = get_label_list(
+                self.train[self._label_col]
+            )
+            self._label_to_id = {
+                l: i for i, l in enumerate(self._label_list)
+            }
 
         return len(self._label_list)
