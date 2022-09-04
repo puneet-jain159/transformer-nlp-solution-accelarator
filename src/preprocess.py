@@ -15,13 +15,13 @@ def preprocess_function(examples, conf, Dataset, Model):
     return result
 
 
-def _preprocess_function_multi_class(examples, conf, model):
+def _preprocess_function_multi_class(examples, conf, Dataset, Model):
     """
     Function to Tokenize the data and perform any preprocessing required
     """
     # Tokenize the texts
     args = (examples[conf.data_args.feature_col],)
-    result = model.tokenizer(
+    result = Model.tokenizer(
         *args, max_length=conf.data_args.max_seq_length, truncation=True
     )
 
