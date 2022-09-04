@@ -23,18 +23,17 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import MLflowCallback
 from datasets import load_metric, list_metrics
 
-from nlp_sa.preprocess import preprocess_function
-from nlp_sa.ModelBuilder import ModelBuilder
-from nlp_sa.data_loader import DataLoader
-from nlp_sa import ConfLoader
+from src.preprocess import preprocess_function
+from src.model_builder import ModelBuilder
+from src.data_loader import DataLoader
+from src import ConfLoader
 from nlp_sa.utils import add_args_from_dataclass
-from nlp_sa.utils.callbacks import CustomMLflowCallback
-from nlp_sa.evaluate import compute_metrics
-
-# yaml
-from nlp_sa.utils.train_utils import detect_checkpoint, apply_preprocessing, get_metric_callable, combine_training_args, \
+from src.utils.callbacks import CustomMLflowCallback
+from src.evaluate import compute_metrics
+from src.utils.train_utils import detect_checkpoint, apply_preprocessing, get_metric_callable, combine_training_args, \
     log_conf_as_yaml, get_check_point
 
+# yaml
 yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
     yaml.representer.SafeRepresenter.represent_str(
         self,
