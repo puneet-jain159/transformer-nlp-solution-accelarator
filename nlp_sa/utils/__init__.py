@@ -12,7 +12,7 @@ def get_config(config_file: str) -> Namespace:
       A Namespace object that contans configurations referenced
       in the program.
     """
-    stream = open(config_file, "r")
+    stream = open(config_file, 'r')
     config_dict = yaml.load(stream, yaml.SafeLoader)
 
     for parameter, value in config_dict.items():

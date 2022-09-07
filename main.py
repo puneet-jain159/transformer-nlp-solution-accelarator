@@ -17,15 +17,15 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import MLflowCallback
 from datasets import load_metric, list_metrics
 
-from src.preprocess import preprocess_function
-from src.model_builder import ModelBuilder
-from src.data_loader import DataLoader
-from src import ConfLoader
-from src.utils.callbacks import CustomMLflowCallback
-from src.evaluate import compute_metrics
-from src.utils.train_utils import get_check_point, log_conf_as_yaml, combine_training_args, get_metric_callable, \
-    apply_preprocessing, detect_checkpoint
+from nlp_sa.preprocess import preprocess_function
+from nlp_sa.ModelBuilder import ModelBuilder
+from nlp_sa.data_loader import DataLoader
+from nlp_sa import ConfLoader
+from nlp_sa.utils import add_args_from_dataclass
+from nlp_sa.utils.callbacks import CustomMLflowCallback
+from nlp_sa.evaluate import compute_metrics
 
+import mlflow
 
 yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
     yaml.representer.SafeRepresenter.represent_str(
@@ -54,38 +54,10 @@ Model = ModelBuilder(conf, DataSet)
 
 
 # Detecting last checkpoint.
-last_checkpoint = None
-if os.path.isdir(conf.training_args.output_dir) and conf.training_args.do_train and not conf.training_args.overwrite_output_dir:
-    last_checkpoint = get_last_checkpoint(conf.training_args.output_dir)
-    if last_checkpoint is None and len(os.listdir(conf.training_args.output_dir)) > 0:
-        raise ValueError(
-            f"Output directory ({conf.training_args.output_dir}) already exists and is not empty. "
-            "Use --overwrite_output_dir to overcome."
-        )
-    elif last_checkpoint is not None and conf.training_args.resume_from_checkpoint is None:
-        logger.info(
-            f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-            "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-        )
+last_checkpoint = detect_checkpoint(conf)
 
-preprocess = partial(preprocess_function, conf=conf,
-                     Dataset=DataSet, Model=Model)
+apply_preprocessing(conf, DataSet, Model)
 
-
-with conf.training_args.main_process_first(desc="dataset map train pre-processing"):
-    DataSet.train = DataSet.train.map(
-        preprocess,
-        batched=True,
-        # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on train dataset")
-
-
-with conf.training_args.main_process_first(desc="dataset map test pre-processing"):
-    DataSet.test = DataSet.test.map(
-        preprocess,
-        batched=True,
-        # load_from_cache_file=not conf.data_args.overwrite_cache,
-        desc="Running tokenizer on test dataset")
 
 # Get the metric function
 compute_m = get_metric_callable(conf, DataSet)

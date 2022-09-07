@@ -1,9 +1,0 @@
-{
-    "environments": {
-        "default": {
-            "profile": "e2-field",
-            "workspace_dir": "/Shared/dbx/projects/transformer-nlp-solution-accelarator",
-            "artifact_location": "dbfs:/dbx/transformer-nlp-solution-accelarator"
-        }
-    }
-}
