@@ -26,7 +26,7 @@ custom:
         first_on_demand: 1
         availability: SPOT_WITH_FALLBACK
         zone_id: us-west-2a
-        instance_profile_arn: arn:aws:iam::997819012307:instance-profile/oetrta-IAM-access
+        instance_profile_arn: arn:aws:iam::997819012307:instance-profile/one-env-databricks-access
       enable_elastic_disk: true
       single_user_name: puneet.jain@databricks.com
       data_security_mode: SINGLE_USER

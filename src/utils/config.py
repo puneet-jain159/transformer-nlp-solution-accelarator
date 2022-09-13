@@ -1,21 +1,23 @@
 import pathlib
-from typing import Dict, Any, Union
-import pandas as pd
 import logging
+import yaml
+from typing import Dict, Any, Union
+from omegaconf import OmegaConf
 
 from transformers import HfArgumentParser, TrainingArguments
 from transformers.utils import logging
-from .utils.arguments import DataTrainingArguments, ModelArguments
+from .arguments import Arguments
 
 from typing import Union, Dict, Any
+
+logger = logging.get_logger(__name__)
 
 
 class ConfLoader:
     def __init__(self, conf: Union[str, Dict[str, Any]] = "conf/model.yaml"):
         self.conf = self._load_conf_file(conf)
         (
-            self.model_args,
-            self.data_args,
+            self.args,
             self.training_args,
         ) = self.load_HfFArgurements()
 
@@ -38,9 +40,7 @@ class ConfLoader:
         Function to load the Hugging Face Arguements returns Model,Data,Training
         Arguements
         """
-        parser = HfArgumentParser(
-            (ModelArguments, DataTrainingArguments, TrainingArguments)
-        )
+        parser = HfArgumentParser((Arguments, TrainingArguments))
         return parser.parse_dict(self.conf)
 
 

@@ -11,27 +11,27 @@ from transformers import EvalPrediction
 
 
 def compute_metrics(p: EvalPrediction, conf, metric, dataset):
-    if conf.data_args.task_name is not None:
-        if conf.data_args.task_name == "multi-class":
-            result = _compute_metrics_multi_class(p, conf, metric)
-        elif conf.data_args.task_name == "ner":
+    if dataset._task_name is not None:
+        if dataset._task_name == "multi-class":
+            result = _compute_metrics_multi_class(p, conf, metric, dataset)
+        elif dataset._task_name == "ner":
             result = _compute_metrics_ner(p, conf, metric, dataset)
         else:
             raise ValueError("task not implemented please implement the task")
     return result
 
 
-def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
+def _compute_metrics_multi_class(p: EvalPrediction, conf, metric, dataset):
     predictions, labels = p
     predictions = np.argmax(predictions, axis=1)
     predictions = predictions.reshape(len(predictions), -1)
 
-    if conf.data_args.task_name is not None:
+    if dataset._task_name is not None:
         result = metric.compute(
             predictions=predictions,
             references=labels.reshape(len(labels), -1),
         )
-        if conf.data_args.return_entity_level_metrics:
+        if conf.args.return_entity_level_metrics:
             # Unpack nested dictionaries
             final_results = {}
             for key, value in result.items():
@@ -41,21 +41,20 @@ def _compute_metrics_multi_class(p: EvalPrediction, conf, metric):
                 else:
                     final_results[key] = value
             return final_results
-        elif conf.model_args.is_regression:
+        elif conf.args.is_regression:
             return {"mse": ((predictions - p.label_ids) ** 2).mean().item()}
         else:
             return {
                 "precision": result["overall_precision"],
                 "recall": result["overall_recall"],
                 "f1": result["overall_f1"],
-                "accuracy": result["overall_accuracy"]}
+                "accuracy": result["overall_accuracy"],
+            }
     else:
         raise ValueError("task name not defined")
 
 
-def _compute_metrics_ner(
-    examples, conf, metric, dataset, special_token_ids=[-100]
-):
+def _compute_metrics_ner(examples, conf, metric, dataset, special_token_ids=[-100]):
     """
     Function to compute the metric of NER Task
     """
@@ -64,12 +63,26 @@ def _compute_metrics_ner(
 
     # Remove ignored index (special tokens)
     for special_token in special_token_ids:
-        predictions.remove(special_token)
-        labels.remove(special_token)
+        # Remove ignored index (special tokens)
+        true_predictions = [
+            [
+                dataset._label_list[p]
+                for (p, l) in zip(prediction, label)
+                if l != special_token
+            ]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [
+                dataset._label_list[l]
+                for (p, l) in zip(prediction, label)
+                if l != special_token
+            ]
+            for prediction, label in zip(predictions, labels)
+        ]
+    results = metric.compute(predictions=true_predictions, references=true_labels)
 
-    results = metric.compute(predictions=predictions, references=labels)
-
-    if conf.data_args.return_entity_level_metrics:
+    if conf.args.return_entity_level_metrics:
         # Unpack nested dictionaries
         final_results = {}
         for key, value in results.items():

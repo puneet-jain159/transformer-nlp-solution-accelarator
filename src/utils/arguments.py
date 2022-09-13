@@ -8,7 +8,7 @@ task_to_keys = {
 
 
 @dataclass
-class DataTrainingArguments:
+class Arguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
 
@@ -17,15 +17,18 @@ class DataTrainingArguments:
     the command line.
     """
 
+    model_name_or_path: str = field(
+        metadata={
+            "help": "Path to pretrained model or model identifier from huggingface.co/models"
+        }
+    )
     task_name: Optional[str] = field(
         default=None,
         metadata={"help": "The task to perform downstream training on."},
     )
     dataset_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "The name of the dataset to use (via the datasets library)."
-        },
+        metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
     dataset_config_name: Optional[str] = field(
         default=None,
@@ -44,9 +47,7 @@ class DataTrainingArguments:
     )
     overwrite_cache: bool = field(
         default=False,
-        metadata={
-            "help": "Overwrite the cached preprocessed datasets or not."
-        },
+        metadata={"help": "Overwrite the cached preprocessed datasets or not."},
     )
     pad_to_max_length: bool = field(
         default=True,
@@ -108,7 +109,7 @@ class DataTrainingArguments:
         },
     )
     database_name: Optional[str] = field(
-        default="default",
+        default=None,
         metadata={"help": "The database name to use with the table"},
     )
     train_table: Optional[str] = field(
@@ -123,41 +124,17 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "A delta table containing the test data."},
     )
-
-    def __post_init__(self):
-        if self.task_name is not None:
-            self.task_name = self.task_name.lower()
-            if self.task_name not in task_to_keys.keys():
-                raise ValueError(
-                    "Unknown task, you should pick one in "
-                    + ",".join(task_to_keys.keys())
-                )
-        if (
-            self.dataset_name is not None
-            and self.train_table is not None
-            and self.validation_table is not None
-        ):
-            raise ValueError(
-                "Either dataset name or a training/validation table should ne specified"
-            )
-        if self.dataset_name is not None:
-            pass
-        elif self.train_table is None or self.validation_table is None:
-            raise ValueError(
-                "Need either a GLUE task, a training/validation table or a dataset name."
-            )
-
-
-@dataclass
-class ModelArguments:
-    """
-    Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
-    """
-
-    model_name_or_path: str = field(
+    train_split: Optional[str] = field(
+        default="train",
         metadata={
-            "help": "Path to pretrained model or model identifier from huggingface.co/models"
-        }
+            "help": "the partition to pick when using the HF Dataset for training"
+        },
+    )
+    eval_split: Optional[str] = field(
+        default="test",
+        metadata={
+            "help": "the partition to pick when using the HF Dataset for validation"
+        },
     )
     experiment_location: Optional[str] = field(
         default="default",
@@ -224,3 +201,28 @@ class ModelArguments:
         default=True,
         metadata={"help": "To serialize and save model for CPU inference"},
     )
+
+    def __post_init__(self):
+        if self.task_name is not None:
+            self.task_name = self.task_name.lower()
+            if self.task_name not in task_to_keys.keys():
+                raise ValueError(
+                    "Unknown task, you should pick one in "
+                    + ",".join(task_to_keys.keys())
+                )
+        else:
+            raise ValueError("task name needs to be defined")
+        if (
+            self.dataset_name is not None
+            and self.train_table is not None
+            and self.validation_table is not None
+        ):
+            raise ValueError(
+                "Either dataset name or a training/validation table should ne specified"
+            )
+        if self.dataset_name is not None:
+            pass
+        elif self.train_table is None or self.validation_table is None:
+            raise ValueError(
+                "Need either a GLUE task, a training/validation table or a dataset name."
+            )

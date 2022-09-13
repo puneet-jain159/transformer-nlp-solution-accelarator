@@ -1,6 +1,7 @@
 #todo: Pinning the versions
 torch
 transformers==4.21.1
+omegaconf
 datasets
 numpy
 pandas
