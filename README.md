@@ -108,12 +108,17 @@ Add your repository to Repos. This could be done via UI, or via CLI command belo
 ```
 databricks repos create --url <your repo URL> --provider <your-provider>
 ```
-This command will create your personal repository under /Repos/<username>/telco_churn. 3. To set up the CI/CD pipeline with the notebook, create a separate Staging repo:
-```
-dbx sync repo -d transformer-nlp-solution-accelarator_dbx --profile e2-field --use-gitignore -ep mlruns/  --no-watch
-```
+This command will create your personal repository under /Repos/<username>/ To set up the CI/CD pipeline with the notebook, create a separate Staging repo:
 
 You can sync your local repository with databricks repos using dbx sync command
 ```
 dbx sync repo -d transformer-nlp-solution-accelarator_dbx --profile e2-field --use-gitignore -ep mlruns/  --no-watch
+```
+To create a Job run for the training pipeline run the below command for e.g
+```
+dbx deploy --job nlp_sa_training_step
+```
+To launch a Job run for the training pipeline run the below command for e.g
+```
+dbx launch  --job nlp_sa_training_step --trace
 ```
