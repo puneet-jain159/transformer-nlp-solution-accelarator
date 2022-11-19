@@ -41,6 +41,9 @@ environments:
       - name: "nlp_sa_training_step"
         <<:
           - *gpu-static-cluster
+        deployment_config:
+          no_package: true # we omit using package since code will be shipped directly from the Repo
+        existing_cluster_id: "1119-002209-p00rc4t6"
         notebook_task:
           notebook_path: "/Repos/puneet.jain@databricks.com/transformer-nlp-solution-accelarator_dbx/main_db"
           source: "WORKSPACE"

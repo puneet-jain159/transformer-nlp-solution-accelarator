@@ -4,6 +4,8 @@ from multiprocessing.sharedctypes import Value
 from datasets import load_dataset, Dataset, ClassLabel
 from src.utils import get_label_list
 import inspect
+import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ class DataLoader:
         label_col=None,
         spark=None,
         conf=None,
+        label2id=None
     ):
         self.conf = conf
         self._dataset_name = (
@@ -79,6 +82,7 @@ class DataLoader:
             else validation_table
         )
         self._label_col = self.conf.args.label_col if label_col is None else label_col
+        self._label2id = self.conf.args.label2id if label2id is None else label2id
         self._spark = spark
 
         self._num_labels = None
@@ -112,6 +116,17 @@ class DataLoader:
                 else:
                     if arg not in ["config", "self"]:
                         logger.warning(f"{arg} not defined in config or method")
+
+    def read_label2id_json(self):
+        if self._label2id == '{}':
+            return '{}'
+        elif "http" in self._label2id:
+            r = requests.get(url=self._label2id)
+            return r.json()
+        else:
+            with open(self._label2id) as f:
+                return json.load(f)
+            # Add function to read from local file
 
     def _load_dataset(self):
         """
@@ -229,6 +244,8 @@ class DataLoader:
         """If the labels are of type ClassLabel, they are already integers
         and we have the map stored somewhere. Otherwise, we have to get
         the list of labels manually."""
+        label2id =  self.read_label2id_json()
+        id2label = {y: x for x, y in label2id.items()}
 
         labels_are_int = isinstance(
             self.train.features[self._label_col].feature,
@@ -237,8 +254,11 @@ class DataLoader:
         if labels_are_int:
             self._label_list = self.train.features[self._label_col].feature.names
             self._label_to_id = {i: i for i in range(len(self._label_list))}
+        elif label2id != '{}':
+            self._label_list = [id2label[z] for z in id2label.keys()]
+            self._label_to_id = label2id
         else:
             self._label_list = get_label_list(self.train[self._label_col])
             self._label_to_id = {l: i for i, l in enumerate(self._label_list)}
-
+            
         return len(self._label_list)

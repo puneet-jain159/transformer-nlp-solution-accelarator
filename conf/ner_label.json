@@ -1,0 +1,13 @@
+{
+    "O": 0,
+    "B-DNA": 1,
+    "I-DNA": 2,
+    "B-protein": 3,
+    "I-protein": 4,
+    "B-cell_type": 5,
+    "I-cell_type": 6,
+    "B-cell_line": 7,
+    "I-cell_line": 8,
+    "B-RNA": 9,
+    "I-RNA": 10
+}

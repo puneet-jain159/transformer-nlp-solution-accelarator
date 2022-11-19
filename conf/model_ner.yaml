@@ -9,6 +9,7 @@ do_train: true
 do_eval: true
 
 dataset_name: tner/bionlp2004
+label2id : conf/ner_label.json
 
 # database_name: default
 # train_table: banking77_train
@@ -31,6 +32,6 @@ load_best_model_at_end: true
 metric_for_best_model: f1
 evaluate_metric: seqeval
 
-num_train_epochs: 10
+num_train_epochs: 15
 seed: 123
 output_dir: /dbfs/puneet.jain@databricks.com/transformers/xlm-roberta-base

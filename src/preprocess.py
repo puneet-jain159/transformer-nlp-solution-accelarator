@@ -1,3 +1,6 @@
+from src.utils import get_label_list
+from datasets import load_dataset, Dataset, ClassLabel
+
 def preprocess_function(examples, conf, dataset, model):
     """
     Function to Tokenize the data based on task name
@@ -30,6 +33,14 @@ def _preprocess_function_ner(examples, conf, dataset, model):
     """
     Function to Tokenize the data and perform any preprocessing required
     """
+
+    labels_are_int = isinstance(dataset.train.features[conf.args.label_col].feature, ClassLabel)
+    if labels_are_int:
+        _label_list  = dataset._label_list
+        _label_to_id = dataset._label_to_id
+    else:
+        _label_list = get_label_list(examples[dataset._label_col])
+        _label_to_id = {l: i for i, l in enumerate(_label_list)}
     b_to_i_label = []
     for idx, label in enumerate(dataset._label_list):
         if (
@@ -65,14 +76,14 @@ def _preprocess_function_ner(examples, conf, dataset, model):
                 label_ids.append(-100)
             # We set the label for the first token of each word.
             elif word_idx != previous_word_idx:
-                label_ids.append(dataset._label_to_id[label[word_idx]])
+                label_ids.append(_label_to_id[label[word_idx]])
             else:
                 """For the other tokens in a word, we set the label
                 to either the current label or -100, depending on
                 the label_all_tokens flag."""
                 if conf.args.label_all_tokens:
                     label_ids.append(
-                        b_to_i_label[dataset._label_to_id[label[word_idx]]]
+                        b_to_i_label[_label_to_id[label[word_idx]]]
                     )
                 else:
                     label_ids.append(-100)

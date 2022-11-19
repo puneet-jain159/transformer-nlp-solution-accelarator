@@ -130,6 +130,12 @@ class Arguments:
             "help": "the partition to pick when using the HF Dataset for training"
         },
     )
+    label2id: Optional[str] = field(
+        default="{}",
+        metadata={
+            "help": "mapping for integer to columns"
+        },
+    )
     eval_split: Optional[str] = field(
         default="test",
         metadata={

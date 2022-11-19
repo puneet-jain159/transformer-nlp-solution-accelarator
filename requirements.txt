@@ -1,6 +1,6 @@
 #todo: Pinning the versions
 torch
-transformers==4.21.1
+transformers==4.21.0
 omegaconf
 datasets
 numpy

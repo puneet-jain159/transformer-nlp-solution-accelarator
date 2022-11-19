@@ -1,5 +1,7 @@
 # Databricks notebook source
 # COMMAND ----------
+%pip install -r requirements.txt
+# COMMAND ----------
 import os
 import yaml
 import logging

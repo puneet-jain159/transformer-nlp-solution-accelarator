@@ -5,7 +5,9 @@ import pathlib
 import shutil
 
 from transformers.trainer_callback import TrainerCallback
-from transformers.utils import flatten_dict, logging, ENV_VARS_TRUE_VALUES
+from transformers.utils.generic import flatten_dict
+from transformers.utils import logging 
+from transformers.utils.import_utils import ENV_VARS_TRUE_VALUES
 
 logger = logging.get_logger(__name__)
 

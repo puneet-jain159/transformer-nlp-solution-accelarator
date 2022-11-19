@@ -190,11 +190,13 @@ class ModelBuilder:
         """
         Function to correct the label2id for NER
         """
+
         # Model has labels -> use them.
         if (
             self.model.config.label2id
             != PretrainedConfig(num_labels=self._dataset._num_labels).label2id
         ):
+
             if list(sorted(self.model.config.label2id.keys())) == list(
                 sorted(self._dataset._label_list)
             ):
@@ -204,11 +206,11 @@ class ModelBuilder:
                     int,
                 )
                 if labels_are_int:
-                    self._dataset.label_to_id = {
+                    self._dataset._label_to_id = {
                         i: int(self.model.config.label2id[l])
                         for i, l in enumerate(self._dataset._label_list)
                     }
-                    self.__label_list = [
+                    self._dataset._label_list = [
                         self.model.config.id2label[i]
                         for i in range(self._dataset._num_labels)
                     ]
